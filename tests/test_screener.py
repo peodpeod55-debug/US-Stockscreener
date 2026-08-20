@@ -66,6 +66,36 @@ def test_run_scan_filters_to_universe_and_grades():
         assert c["dr_symbols"]
 
 
+class Fake402Client(FakeClient):
+    """เหมือน FakeClient แต่หุ้นใน blocked ตอบ HTTP 402 (ตั้งธง saw_402)"""
+
+    def __init__(self, calendar, prices, blocked=()):
+        super().__init__(calendar, prices)
+        self.blocked = set(blocked)
+        self.saw_402 = False
+
+    def get_historical_prices(self, symbol, days=250):
+        if symbol in self.blocked:
+            self.saw_402 = True
+            return None
+        return super().get_historical_prices(symbol, days)
+
+
+def test_run_scan_separates_plan_blocked_from_no_data():
+    """402 → reason not_in_plan · ไม่มีข้อมูลเฉย ๆ → no_data (ธงต้อง reset ต่อตัว)"""
+    bars = _uptrend_prices()
+    earn_date = bars[2]["date"]
+    calendar = [
+        {"symbol": "WMT", "date": earn_date, "time": "amc"},   # โดน 402 ก่อน
+        {"symbol": "AAPL", "date": earn_date, "time": "amc"},  # ไม่มีข้อมูลเฉย ๆ
+    ]
+    cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
+    scan = run_scan(cfg, lookback_days=3,
+                    client=Fake402Client(calendar, {}, blocked={"WMT"}))
+    reasons = {p["symbol"]: p["reason"] for p in scan["pending"]}
+    assert reasons == {"WMT": "not_in_plan", "AAPL": "no_data"}
+
+
 def test_run_scan_pending_when_reaction_day_missing():
     """งบ AMC ของ bar ล่าสุด → วันตอบรับยังไม่มีข้อมูล → ต้องเข้า pending"""
     bars = _uptrend_prices()

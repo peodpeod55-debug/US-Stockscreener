@@ -58,6 +58,30 @@ def test_pending_shown():
     assert "WMT" in text and "TGT" in text
 
 
+def test_pending_plan_blocked_shown_on_separate_line():
+    pending = [
+        {"symbol": "WMT", "date": "2026-08-20", "timing": "bmo",
+         "reason": "waiting"},
+        {"symbol": "HEI", "date": "2026-08-19", "timing": "amc",
+         "reason": "not_in_plan"},
+    ]
+    msgs = format_scan(base_scan([], pending=pending))
+    lines = "\n".join(msgs).splitlines()
+    waiting_line = next(l for l in lines if "รอวันตอบรับ" in l)
+    blocked_line = next(l for l in lines if "แผนฟรี" in l)
+    assert "WMT" in waiting_line and "HEI" not in waiting_line
+    assert "HEI" in blocked_line and "WMT" not in blocked_line
+
+
+def test_pending_only_plan_blocked_no_waiting_line():
+    pending = [{"symbol": "HEI", "date": "2026-08-19", "timing": "amc",
+                "reason": "not_in_plan"}]
+    msgs = format_scan(base_scan([], pending=pending))
+    text = "\n".join(msgs)
+    assert "แผนฟรี" in text and "HEI" in text
+    assert "รอวันตอบรับ" not in text
+
+
 def test_split_long_messages():
     many = [make_candidate(symbol=f"SYM{i}") for i in range(40)]
     msgs = format_scan(base_scan(many))

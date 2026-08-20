@@ -61,12 +61,15 @@ def run_scan(config, lookback_days=None, client=None):
     candidates, skipped, pending = [], {"C": 0, "D": 0}, []
     for item in reported:
         sym = item["symbol"]
+        client.saw_402 = False  # ธงต่อ symbol — ดู lookup.lookup_symbol
         try:
             prices = client.get_historical_prices(sym, days=250)
         except ApiCallBudgetExceeded:
             break
         if not prices or len(prices) < 70:
-            pending.append({**item, "reason": "no_data"})
+            reason = ("not_in_plan" if getattr(client, "saw_402", False)
+                      else "no_data")
+            pending.append({**item, "reason": reason})
             continue
         analysis = analyze_stock(prices, item["date"], item["timing"])
         levels = compute_levels(prices, item["date"], item["timing"])

@@ -130,9 +130,14 @@ def format_scan(scan):
     )
     footer = f"ตกเกณฑ์: C={skipped['C']}, D={skipped['D']}"
     pending = scan.get("pending") or []
-    if pending:
-        plist = ", ".join(f"{p['symbol']} ({p['date']})" for p in pending)
+    blocked = [p for p in pending if p.get("reason") == "not_in_plan"]
+    waiting = [p for p in pending if p.get("reason") != "not_in_plan"]
+    if waiting:
+        plist = ", ".join(f"{p['symbol']} ({p['date']})" for p in waiting)
         footer += f"\n⏳ รอวันตอบรับงบ (สแกนรอบถัดไป): {plist}"
+    if blocked:
+        plist = ", ".join(f"{p['symbol']} ({p['date']})" for p in blocked)
+        footer += f"\n🔒 แผนฟรี FMP ไม่ครอบคลุม: {plist}"
 
     if not scan["candidates"]:
         return [f"{header}\n\n😴 ไม่มีหุ้นเข้าเกณฑ์เกรด A/B\n{footer}"]
