@@ -45,6 +45,10 @@ def format_scan(scan):
         f"Universe {scan['universe_size']} ตัว · ออกงบ {len(scan['reported_symbols'])} ตัว"
     )
     footer = f"ตกเกณฑ์: C={skipped['C']}, D={skipped['D']}"
+    pending = scan.get("pending") or []
+    if pending:
+        plist = ", ".join(f"{p['symbol']} ({p['date']})" for p in pending)
+        footer += f"\n⏳ รอวันตอบรับงบ (สแกนรอบถัดไป): {plist}"
 
     if not scan["candidates"]:
         return [f"{header}\n\n😴 ไม่มีหุ้นเข้าเกณฑ์เกรด A/B\n{footer}"]

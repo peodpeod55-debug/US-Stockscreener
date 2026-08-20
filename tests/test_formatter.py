@@ -17,11 +17,12 @@ def make_candidate(symbol="AAPL", grade="A", dr="AAPL01 AAPL03"):
     }
 
 
-def base_scan(candidates, skipped=None):
+def base_scan(candidates, skipped=None, pending=None):
     return {"from_date": "2026-08-18", "to_date": "2026-08-20",
             "universe_size": 529, "reported_symbols": ["AAPL"],
             "candidates": candidates,
             "skipped_counts": skipped or {"C": 0, "D": 0},
+            "pending": pending or [],
             "api_stats": {}}
 
 
@@ -46,6 +47,15 @@ def test_no_candidates_message():
     assert len(msgs) == 1
     assert "ไม่มีหุ้น" in msgs[0]
     assert "C=2" in msgs[0] and "D=1" in msgs[0]
+
+
+def test_pending_shown():
+    pending = [{"symbol": "WMT", "date": "2026-08-20", "timing": "bmo"},
+               {"symbol": "TGT", "date": "2026-08-19", "timing": "unknown"}]
+    msgs = format_scan(base_scan([], pending=pending))
+    text = "\n".join(msgs)
+    assert "รอวันตอบรับ" in text
+    assert "WMT" in text and "TGT" in text
 
 
 def test_split_long_messages():

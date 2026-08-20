@@ -58,7 +58,7 @@ def run_scan(config, lookback_days=None, client=None):
                              "date": e.get("date"),
                              "timing": normalize_timing(e.get("time"))})
 
-    candidates, skipped = [], {"C": 0, "D": 0}
+    candidates, skipped, pending = [], {"C": 0, "D": 0}, []
     for item in reported:
         sym = item["symbol"]
         try:
@@ -66,10 +66,13 @@ def run_scan(config, lookback_days=None, client=None):
         except ApiCallBudgetExceeded:
             break
         if not prices or len(prices) < 70:
+            pending.append({**item, "reason": "no_data"})
             continue
         analysis = analyze_stock(prices, item["date"], item["timing"])
         levels = compute_levels(prices, item["date"], item["timing"])
         if levels is None:
+            # วันตอบรับงบยังไม่มีในข้อมูล (งบวันนี้/เมื่อคืน) — รอสแกนรอบถัดไป
+            pending.append({**item, "reason": "waiting"})
             continue
         grade = analysis["composite"]["grade"]
         if grade in ("C", "D"):
@@ -96,6 +99,7 @@ def run_scan(config, lookback_days=None, client=None):
         "reported_symbols": [r["symbol"] for r in reported],
         "candidates": candidates,
         "skipped_counts": skipped,
+        "pending": pending,
         "api_stats": client.get_api_stats(),
     }
 

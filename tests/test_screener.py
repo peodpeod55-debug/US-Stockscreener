@@ -57,9 +57,25 @@ def test_run_scan_filters_to_universe_and_grades():
                     client=FakeClient(calendar, {"AAPL": bars}))
     assert scan["reported_symbols"] == ["AAPL"]
     all_syms = [c["symbol"] for c in scan["candidates"]]
-    total = len(all_syms) + scan["skipped_counts"]["C"] + scan["skipped_counts"]["D"]
+    total = (len(all_syms) + scan["skipped_counts"]["C"]
+             + scan["skipped_counts"]["D"] + len(scan["pending"]))
     assert total == 1
     for c in scan["candidates"]:
         assert c["grade"] in ("A", "B")
         assert c["levels"]["price"] > 0
         assert c["dr_symbols"]
+
+
+def test_run_scan_pending_when_reaction_day_missing():
+    """งบ AMC ของ bar ล่าสุด → วันตอบรับยังไม่มีข้อมูล → ต้องเข้า pending"""
+    bars = _uptrend_prices()
+    calendar = [
+        {"symbol": "WMT", "date": bars[0]["date"], "time": "amc"},   # รอวันตอบรับ
+        {"symbol": "AAPL", "date": bars[0]["date"], "time": None},   # ไม่มีข้อมูลราคา
+    ]
+    cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
+    scan = run_scan(cfg, lookback_days=3,
+                    client=FakeClient(calendar, {"WMT": bars}))
+    pending_syms = {p["symbol"] for p in scan["pending"]}
+    assert pending_syms == {"WMT", "AAPL"}
+    assert scan["candidates"] == []
