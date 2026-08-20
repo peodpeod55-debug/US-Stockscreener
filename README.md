@@ -41,11 +41,22 @@ python -m bot.main
 
 ## ตั้งรันอัตโนมัติตอนเปิดเครื่อง
 
-เปิด PowerShell ในโฟลเดอร์นี้:
+**วิธีที่ใช้อยู่ (ไม่ต้องใช้สิทธิ์ admin):** shortcut ใน Startup folder ชี้ไปที่ `start_bot_hidden.vbs`
+ซึ่งรัน `run_bot.bat` แบบไม่มีหน้าต่าง และ bat มี loop restart เองถ้า bot crash
+ติดตั้งด้วย:
 
 ```powershell
-.\setup_task.ps1
+$startup = [Environment]::GetFolderPath('Startup')
+$ws = New-Object -ComObject WScript.Shell
+$lnk = $ws.CreateShortcut("$startup\USEarningsScreenerBot.lnk")
+$lnk.TargetPath = "wscript.exe"
+$lnk.Arguments = '"' + "$PWD\start_bot_hidden.vbs" + '"'
+$lnk.Save()
 ```
+
+**ทางเลือก (ต้องรัน PowerShell แบบ Run as Administrator):** `.\setup_task.ps1` ใช้ Task Scheduler แทน
+
+หยุด bot ชั่วคราว: `Get-CimInstance Win32_Process -Filter "Name='python.exe'" | Where-Object { $_.CommandLine -like '*bot.main*' } | ForEach-Object { Stop-Process -Id $_.ProcessId }` (ระวัง run_bot.bat จะ restart ใน 60 วิ — ปิดหน้าต่าง cmd ของมันด้วยหรือลบ shortcut ออกจาก Startup)
 
 ## โครงสร้าง
 
