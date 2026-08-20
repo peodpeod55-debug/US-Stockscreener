@@ -8,6 +8,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 from bot import fetch_cache
+from bot.chart import build_chart_png
 from bot.config import PROJECT_ROOT, load_config
 from bot.formatter import (
     format_breakouts,
@@ -53,8 +54,26 @@ logger = logging.getLogger("bot")
 CONFIG = load_config()
 
 
+CHART_MAX = 6                   # เพดานรูปต่อหนึ่งรอบแจ้ง กันสแปม
+
+
 def _authorized(update: Update) -> bool:
     return str(update.effective_chat.id) == str(CONFIG.chat_id)
+
+
+async def _send_chart(bot, chat_id, symbol, levels=None, caption=None):
+    """แนบกราฟจากราคาใน cache (เพิ่งดึงตอนสร้างข้อความ — ไม่มี API call เพิ่ม)
+
+    cache หมดอายุ/วาดพัง → ข้ามเงียบๆ ไม่ล้มข้อความหลักที่ส่งไปแล้ว
+    """
+    try:
+        prices = fetch_cache.get(("prices", symbol, 250))
+        png = await asyncio.to_thread(build_chart_png, symbol, prices, levels)
+        if png:
+            await bot.send_photo(chat_id=chat_id, photo=png,
+                                 caption=caption or symbol)
+    except Exception:
+        logger.exception("chart %s failed", symbol)
 
 
 async def _do_scan_and_send(bot, chat_id, lookback):
@@ -67,6 +86,10 @@ async def _do_scan_and_send(bot, chat_id, lookback):
     record_signals(scan["candidates"], scan["to_date"])
     for msg in messages:
         await bot.send_message(chat_id=chat_id, text=msg)
+    for c in scan["candidates"][:CHART_MAX]:
+        await _send_chart(bot, chat_id, c["symbol"], c["levels"],
+                          caption=f"📈 {c['symbol']} — เกรด {c['grade']} "
+                                  f"({c['score']:.0f}/100)")
     # หุ้นเกรด A/B เข้า watchlist อัตโนมัติ → ได้เตือนทะลุแนว/วันงบต่อเอง
     added = auto_add([c["symbol"] for c in scan["candidates"]])
     if added:
@@ -106,7 +129,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ดูราคารายตัว: พิมพ์ ticker ได้เลย เช่น NVDA\n"
         f"หลายตัวพร้อมกัน (สูงสุด {LOOKUP_MAX}): NVDA TSLA AAPL\n"
         "ได้ราคาปิดล่าสุด, %เปลี่ยน, วอลุ่ม, วันงบ,\n"
-        "สัญญาณหลังงบ + เกรด, High/Low 5วัน/3ด./52w\n\n"
+        "สัญญาณหลังงบ + เกรด, High/Low 5วัน/3ด./52w\n"
+        "พร้อมกราฟ 6 เดือน (เส้นแนว + SL)\n\n"
         f"Watchlist (สูงสุด {WATCHLIST_MAX} ตัว):\n"
         "ติดตาม NVDA — เพิ่มหุ้นเข้า watchlist\n"
         "เลิกติดตาม NVDA — เอาออก\n"
@@ -218,6 +242,9 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"❌ ไม่พบข้อมูล {sym} — เช็ค ticker เช่น NVDA / AAPL / BRK.B")
             continue
         await update.message.reply_text(format_lookup(snap))
+        await _send_chart(context.bot, update.effective_chat.id, sym,
+                          snap.get("levels"),
+                          caption=f"{sym} — ปิด {snap['price']:,.2f}")
 
 
 async def reminder_job(context: ContextTypes.DEFAULT_TYPE):
@@ -273,6 +300,17 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
         for msg in (format_breakouts(alerts), format_sl_breaks(sl_alerts)):
             if msg:
                 await context.bot.send_message(chat_id=CONFIG.chat_id, text=msg)
+        tagged = ([(s, "🚀 ทะลุแนว") for s in alerts]
+                  + [(s, "🛑 หลุด SL") for s in sl_alerts])
+        seen = set()
+        for snap, tag in tagged[:CHART_MAX]:
+            if snap["symbol"] in seen:      # ตัวเดียวทะลุแนว+หลุด SL วันเดียวกัน
+                continue
+            seen.add(snap["symbol"])
+            await _send_chart(context.bot, CONFIG.chat_id, snap["symbol"],
+                              snap.get("levels"),
+                              caption=f"{tag} {snap['symbol']} — "
+                                      f"ปิด {snap['price']:,.2f}")
     except Exception:
         logger.exception("breakout job failed")
 
