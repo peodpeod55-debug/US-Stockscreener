@@ -13,11 +13,13 @@ from bot.formatter import (
     format_lookup,
     format_reminders,
     format_scan,
+    format_weekly,
 )
 from bot.lookup import LOOKUP_MAX, SymbolNotCovered, lookup_symbol, parse_tickers
 from bot.nasdaq_cal import fetch_nasdaq_earnings
 from bot.reminders import build_reminders
-from bot.screener import load_universe, run_scan, save_reports
+from bot.screener import REPORTS_DIR, load_universe, run_scan, save_reports
+from bot.weekly import SIGNAL_LOOKBACK_DAYS, build_weekly_items
 from bot.yahoo_prices import fetch_yahoo_prices
 from bot.watchlist import (
     AUTO_WATCH_DAYS,
@@ -105,9 +107,12 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "บอทจะเตือนตอนเช้าเมื่อหุ้นที่ติดตาม\n"
         "มีงบวันนี้/พรุ่งนี้ (บอก BMO/AMC)\n"
         f"หุ้นเกรด A/B จากสแกนเข้าเองอัตโนมัติ {AUTO_WATCH_DAYS} วัน\n\n"
+        f"สรุป — ผลหุ้นที่บอทแจ้งย้อนหลัง {SIGNAL_LOOKBACK_DAYS} วัน\n"
+        "(+/-% ตั้งแต่วันแจ้ง, เคยหลุด SL ไหม)\n\n"
         "Push อัตโนมัติ: อังคาร–เสาร์ 08:30 น.\n"
         "เตือนวันงบ: ทุกวัน 08:25 น.\n"
-        "เตือนทะลุแนว (High 5วัน/3ด.ก่อนงบ): อังคาร–เสาร์ 08:20 น."
+        "เตือนทะลุแนว (High 5วัน/3ด.ก่อนงบ): อังคาร–เสาร์ 08:20 น.\n"
+        "สรุปผลรายสัปดาห์: อาทิตย์ 09:00 น."
     )
 
 
@@ -162,6 +167,14 @@ async def _handle_watch_command(update, action, tickers):
 async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """พิมพ์ ticker (ไม่ใช่คำสั่ง /) → snapshot ราคารายตัว · "ติดตาม ..." → watchlist"""
     if not _authorized(update):
+        return
+    if update.message.text.strip() in ("สรุป", "สรุปผล"):
+        try:
+            await _send_weekly(context.bot, update.effective_chat.id,
+                               notify_empty=True)
+        except Exception:
+            logger.exception("weekly summary failed")
+            await update.message.reply_text("⚠️ สรุปผลล้มเหลว ดู bot.log")
         return
     watch = parse_watch_command(update.message.text)
     if watch:
@@ -230,7 +243,8 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
         for sym in symbols:
             try:
                 snap = await asyncio.to_thread(
-                    lookup_symbol, client, sym, universe)
+                    lookup_symbol, client, sym, universe,
+                    fallback_prices_fn=fetch_yahoo_prices)
             except Exception:
                 logger.exception("breakout check %s failed", sym)
                 continue
@@ -241,6 +255,43 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=CONFIG.chat_id, text=msg)
     except Exception:
         logger.exception("breakout job failed")
+
+
+def _weekly_get_prices(client, sym):
+    """ราคาสำหรับสรุปรายสัปดาห์ — FMP ก่อน, 402 → yahoo (แบบเดียวกับ lookup)"""
+    client.saw_402 = False
+    prices = client.get_historical_prices(sym, days=250)
+    if not prices and getattr(client, "saw_402", False):
+        try:
+            prices = fetch_yahoo_prices(sym, 250)
+        except Exception:
+            prices = None
+    return prices
+
+
+async def _send_weekly(bot, chat_id, notify_empty=False):
+    """สรุปผลหุ้นที่บอทแจ้ง 30 วันล่าสุด (PEAD drift)"""
+    client = FMPClient(api_key=CONFIG.fmp_api_key, max_api_calls=60)
+    items = await asyncio.to_thread(
+        build_weekly_items, REPORTS_DIR,
+        lambda sym: _weekly_get_prices(client, sym))
+    msg = format_weekly(items)
+    if msg:
+        await bot.send_message(chat_id=chat_id, text=msg)
+    elif notify_empty:
+        await bot.send_message(
+            chat_id=chat_id,
+            text=f"ยังไม่มีหุ้นเกรด A/B ที่แจ้งใน {SIGNAL_LOOKBACK_DAYS} วันล่าสุด")
+
+
+async def weekly_job(context: ContextTypes.DEFAULT_TYPE):
+    """อาทิตย์เช้า: สรุปว่าหุ้นที่บอทเคยแจ้ง ตอนนี้เป็นยังไงบ้าง"""
+    if datetime.now(TZ).weekday() != 6:  # อาทิตย์
+        return
+    try:
+        await _send_weekly(context.bot, CONFIG.chat_id)
+    except Exception:
+        logger.exception("weekly job failed")
 
 
 async def daily_job(context: ContextTypes.DEFAULT_TYPE):
@@ -268,6 +319,8 @@ def main():
     app.job_queue.run_daily(reminder_job, time=time(8, 25, tzinfo=TZ))
     # เตือนทะลุแนวเฉพาะหลังวันซื้อขาย US (เช็ค weekday ใน callback)
     app.job_queue.run_daily(breakout_job, time=time(8, 20, tzinfo=TZ))
+    # สรุปผลรายสัปดาห์ เช้าวันอาทิตย์ (เช็ค weekday ใน callback)
+    app.job_queue.run_daily(weekly_job, time=time(9, 0, tzinfo=TZ))
     logger.info("bot starting")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 

@@ -145,6 +145,30 @@ def format_breakouts(snaps):
     return "\n".join(lines)
 
 
+def format_weekly(items):
+    """สรุปผลหุ้นที่เคยแจ้ง (PEAD drift) — None ถ้าไม่มีสัญญาณในช่วงที่ดู"""
+    if not items:
+        return None
+    items = sorted(items, key=lambda it: it["pct"], reverse=True)
+    lines = ["📊 สรุปผลหุ้นที่บอทแจ้ง (30 วันล่าสุด)"]
+    for it in items:
+        icon = GRADE_ICON.get(it.get("grade"), "⚪")
+        score = f" · {it['score']:.0f}" if it.get("score") is not None else ""
+        lines.append("")
+        lines.append(f"{icon} {it['symbol']} [เกรด {it['grade']}{score}] "
+                     f"แจ้ง {it['flag_date']} @ {it['flag_price']:,.2f}")
+        line = (f"   ตอนนี้ {it['price_now']:,.2f} → {_signed(it['pct'])} "
+                f"({it['days']} วัน)")
+        if it.get("sl_hit"):
+            line += f" · 🛑 เคยหลุด SL {it['sl']:,.2f} เมื่อ {it['sl_hit']}"
+        lines.append(line)
+    n = len(items)
+    avg = sum(it["pct"] for it in items) / n
+    wins = sum(1 for it in items if it["pct"] > 0)
+    lines += ["", f"รวม {n} ตัว · เฉลี่ย {_signed(avg)} · บวก {wins}/{n}"]
+    return "\n".join(lines)
+
+
 _TIMING_TH = {"bmo": "ก่อนเปิดตลาด US", "amc": "หลังปิดตลาด US"}
 _DAYS_TH = {0: "วันนี้", 1: "พรุ่งนี้"}
 
