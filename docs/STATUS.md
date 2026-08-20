@@ -5,7 +5,7 @@
 ## โปรเจคนี้คืออะไร
 
 Telegram bot (`@Sakuro_usbot`) คัดกรองหุ้น US "อาการหลังงบดี" จาก universe
-**หุ้นมี DR ไทย ∪ S&P 500 = 529 ตัว** (จาก `us_stock_list.csv`: `dr=Y` หรือ index มี SP500)
+**หุ้นมี DR ไทย ∪ S&P 500 = 566 ตัว** (จาก `us_stock_list.csv`: `dr=Y` หรือ index มี SP500 — ตรวจทาน DR กับ SET ล่าสุด 2026-08-20: dr=Y 168 ตัว / 297 DR)
 ให้คะแนน 5-factor (Gap 25% / Pre-Earnings Trend 30% / Volume 20% / MA200 15% / MA50 10%)
 แจ้งเฉพาะเกรด A (≥85) / B (70–84) พร้อม levels แบบ SET Earnings Breakout Screener เดิม
 (High 5 วันก่อนงบ, High 3 เดือน, High สัปดาห์ก่อน, ความถี่ new 3M high ใน 10 วัน, SL = low วันงบ, Volume ratio, สัญลักษณ์ DR)

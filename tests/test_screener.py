@@ -11,7 +11,7 @@ def test_load_universe_dr_or_sp500():
     uni = load_universe(ROOT / "us_stock_list.csv")
     assert "AAPL" in uni                       # DR + SP500
     assert "ABT" in uni                        # SP500 เท่านั้น (dr=N)
-    assert "AAOI" not in uni                   # ไม่มี DR ไม่อยู่ SP500
+    assert "ABEO" not in uni                   # ไม่มี DR ไม่อยู่ SP500
     assert uni["AAPL"]["dr_symbols"].startswith("AAPL01")
     assert 400 < len(uni) < 700
 

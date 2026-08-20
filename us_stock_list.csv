@@ -1,7 +1,7 @@
 ﻿ticker,name,group,exchange,exchange_tier,index,dr,dr_count,dr_symbols,sector,industry,price,dollar_vol,mcap,stage,pct_from_52wh,last_bar,status
 A,"Agilent Technologies, Inc.",US,NYSE,NYSE,SP500,N,0,,Industrials,Biotechnology: Laboratory Analytical Instruments,155.41,237000000.0,41927020544.0,5,-2.64,2026-08-19,active
 AAL,"American Airlines Group, Inc.",US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Consumer Discretionary,Air Freight/Delivery Services,13.86,901000000.0,9552226304.0,7,-26.2,2026-08-19,active
-AAOI,"Applied Optoelectronics, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Technology,Semiconductors,122.19,1590000000.0,12709065728.0,6,-47.7,2026-08-19,active
+AAOI,"Applied Optoelectronics, Inc.",US,NASDAQ,NASDAQ Global,,Y,2,AAOI03 AAOI23,Technology,Semiconductors,122.19,1590000000.0,12709065728.0,6,-47.7,2026-08-19,active
 AAON,"AAON, Inc.",US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Industrials,Industrial Machinery/Components,80.99,115000000.0,7228710400.0,7,-46.1,2026-08-19,active
 AAPL,Apple Inc.,US,NASDAQ,NASDAQ Global Select,SP500+NDX+DOW30,Y,4,AAPL01 AAPL03 AAPL19 AAPL80,Technology,Computer Manufacturing,316.83,16800000000.0,4464797286400.0,4,-8.05,2026-08-19,active
 ABAT,American Battery Technology Company,US,NASDAQ,NASDAQ Capital Market,,N,0,,Basic Materials,Metal Mining,2.4,7330000.0,339671904.0,8,-79.1,2026-08-19,active
@@ -79,7 +79,7 @@ AKAN,Akanda Corp.,US,NASDAQ,NASDAQ Capital Market,,N,0,,Health Care,Medicinal Ch
 AKBA,"Akebia Therapeutics, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,0.8854,4530000.0,247511296.0,8,-73.3,2026-08-19,active
 AKTS,"Aktis Oncology, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,25.02,5750000.0,1369222400.0,5,-26.8,2026-08-19,active
 AKTX,"Akari Therapeutics, Plc",US,NASDAQ,NASDAQ Capital Market,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,7.9,351000.0,12252870.0,8,-84.1,2026-08-19,active
-ALAB,"Astera Labs, Inc.",US,NASDAQ,NASDAQ Global Select,NDX,Y,1,ALAB01,Technology,Semiconductors,289.02,1500000000.0,55794540544.0,6,-42.1,2026-08-19,active
+ALAB,"Astera Labs, Inc.",US,NASDAQ,NASDAQ Global Select,NDX,Y,2,ALAB01 ALAB23,Technology,Semiconductors,289.02,1500000000.0,55794540544.0,6,-42.1,2026-08-19,active
 ALB,Albemarle Corporation,US,NYSE,NYSE,SP500,N,0,,Industrials,Major Chemicals,134.28,280000000.0,16066387968.0,8,-39.1,2026-08-19,active
 ALDX,"Aldeyra Therapeutics, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,1.58,1380000.0,95315744.0,8,-74.4,2026-08-19,active
 ALGM,"Allegro MicroSystems, Inc.",US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Technology,Semiconductors,38.35,100000000.0,7342376448.0,7,-46.6,2026-08-19,active
@@ -113,12 +113,13 @@ AMD,"Advanced Micro Devices, Inc.",US,NASDAQ,NASDAQ Global Select,SP500+NDX,Y,3,
 AME,"AMETEK, Inc.",US,NYSE,NYSE,SP500,N,0,,Industrials,Industrial Machinery/Components,243.22,321000000.0,57313021952.0,3,-6.87,2026-08-19,active
 AMG,"Affiliated Managers Group, Inc.",US,NYSE,NYSE,SP400,N,0,,Finance,Investment Managers,355.41,91900000.0,9387118592.0,3,-9.54,2026-08-19,active
 AMGN,Amgen Inc.,US,NASDAQ,NASDAQ Global Select,SP500+NDX+DOW30,Y,1,AMGN06,Health Care,Biotechnology: Biological Products (No Diagnostic Substances),442.36,1120000000.0,225153368064.0,5,-0.187,2026-08-19,active
-AMKR,"Amkor Technology, Inc.",US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Technology,Semiconductors,50.89,333000000.0,13381650432.0,7,-47.4,2026-08-19,active
+AMKR,"Amkor Technology, Inc.",US,NASDAQ,NASDAQ Global Select,SP400,Y,2,AMKR03 AMKR23,Technology,Semiconductors,50.89,333000000.0,13381650432.0,7,-47.4,2026-08-19,active
 AMLX,"Amylyx Pharmaceuticals, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,38.6,96500000.0,2410080512.0,5,-1.18,2026-08-19,active
 AMP,"Ameriprise Financial, Inc.",US,NYSE,NYSE,SP500,N,0,,Finance,Investment Managers,559.78,252000000.0,49610584064.0,4,-2.23,2026-08-19,active
 AMPG,"AmpliTech Group, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Telecommunications,Telecommunications Equipment,3.57,13200000.0,111162384.0,7,-64.7,2026-08-19,active
 AMPH,"Amphastar Pharmaceuticals, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,21.74,9760000.0,849908096.0,1,-30.5,2026-08-19,active
 AMPL,"Amplitude, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Technology,Computer Software: Prepackaged Software,12.83,25700000.0,1177658880.0,5,-5.52,2026-08-19,active
+AMPX,"Amprius Technologies, Inc.",US,NYSE,NYSE,,Y,1,AMPX03,Industrials,Electrical Products,10.3,80500000.0,1505360881.6,,-57.5,2026-08-19,active
 AMRX,"Amneal Pharmaceuticals, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,18.11,34400000.0,6335504896.0,5,-5.97,2026-08-19,active
 AMSC,American Superconductor Corporation,US,NASDAQ,NASDAQ Global Select,,N,0,,Consumer Discretionary,Metal Fabrications,31.16,24900000.0,1563712384.0,8,-55.8,2026-08-19,active
 AMSF,"AMERISAFE, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Finance,Property-Casualty Insurers,26.18,11600000.0,504180800.0,8,-41.3,2026-08-19,active
@@ -185,7 +186,7 @@ ASTE,"Astec Industries, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Industri
 ASTH,"Astrana Health, Inc.",US,NASDAQ,NASDAQ Capital Market,SP600,N,0,,Consumer Discretionary,Professional Services,39.4,20700000.0,1942507008.0,3,-23.6,2026-08-19,active
 ASTI,"Ascent Solar Technologies, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Technology,Semiconductors,3.14,1170000.0,30823594.0,8,-68.2,2026-08-19,active
 ASTL,Algoma Steel Group Inc.,US,NASDAQ,NASDAQ Global,,N,0,,Industrials,Steel/Iron Ore,4.79,6230000.0,506118432.0,2,-18.8,2026-08-19,active
-ASTS,"AST SpaceMobile, Inc.",US,NASDAQ,NASDAQ Global Select,,Y,2,ASTS01 ASTS03,Consumer Discretionary,Telecommunications Equipment,66.43,771000000.0,27833257984.0,8,-50.4,2026-08-19,active
+ASTS,"AST SpaceMobile, Inc.",US,NASDAQ,NASDAQ Global Select,,Y,3,ASTS01 ASTS03 ASTS23,Consumer Discretionary,Telecommunications Equipment,66.43,771000000.0,27833257984.0,8,-50.4,2026-08-19,active
 ASYS,"Amtech Systems, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Technology,Industrial Machinery/Components,14.82,6910000.0,280129600.0,7,-42.4,2026-08-19,active
 ATAI,AtaiBeckley Inc.,US,NASDAQ,NASDAQ Global,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,7.36,63200000.0,2692477696.0,5,-0.136,2026-08-19,active
 ATAT,Atour Lifestyle Holdings Limited,US,NASDAQ,NASDAQ Global Select,,N,0,,Consumer Discretionary,Hotels/Resorts,37.0,29100000.0,4814398464.0,2,-12.9,2026-08-19,active
@@ -233,6 +234,7 @@ AZI,Autozi Internet Technology (Global) Ltd.,US,NASDAQ,NASDAQ Capital Market,,N,
 AZO,"AutoZone, Inc.",US,NYSE,NYSE,SP500,N,0,,Consumer Discretionary,Auto & Home Supply Stores,3076.89,526000000.0,49384198144.0,8,-29.9,2026-08-19,active
 AZTA,"Azenta, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Technology,Industrial Machinery/Components,35.62,21400000.0,1485542528.0,5,-14.6,2026-08-19,active
 BA,Boeing Company (The),US,NYSE,NYSE,SP500+DOW30,Y,1,BOEING80,Industrials,Aerospace,222.2,1300000000.0,178584109056.0,6,-12.6,2026-08-19,active
+BABA,Alibaba Group Holding Limited,US,NYSE,NYSE,,Y,6,BABA01 BABA06 BABA13 BABA19 BABA23 BABA80,Consumer Discretionary,Internet Retail,124.75,1470000000.0,303645519466.8,,-35.3,2026-08-19,active
 BAC,Bank of America Corporation,US,NYSE,NYSE,SP500,Y,1,BAC03,Finance,Major Banks,63.17,1710000000.0,441731907584.0,4,-3.16,2026-08-19,active
 BAH,Booz Allen Hamilton Holding Corporation,US,NYSE,NYSE,SP400,N,0,,Consumer Discretionary,Professional Services,78.84,166000000.0,9017764864.0,1,-28.2,2026-08-19,active
 BALL,Ball Corporation,US,NYSE,NYSE,SP500,N,0,,Industrials,Containers/Packaging,62.62,121000000.0,16973214720.0,3,-7.69,2026-08-19,active
@@ -257,7 +259,7 @@ BCPC,Balchem Corporation,US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Industrials,M
 BCRX,"BioCryst Pharmaceuticals, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Biological Products (No Diagnostic Substances),10.07,32200000.0,2706116864.0,5,-10.2,2026-08-19,active
 BDTX,"Black Diamond Therapeutics, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Biological Products (No Diagnostic Substances),2.19,1190000.0,110019408.0,1,-55.7,2026-08-19,active
 BDX,"Becton, Dickinson and Company",US,NYSE,NYSE,SP500,Y,1,BDX06,Health Care,Medical/Dental Instruments,187.6,325000000.0,48174333952.0,5,-0.173,2026-08-19,active
-BE,Bloom Energy Corporation,US,NYSE,NYSE,,N,0,,Energy,Industrial Machinery/Components,206.63,3510000000.0,68377473024.0,6,-41.2,2026-08-19,active
+BE,Bloom Energy Corporation,US,NYSE,NYSE,,Y,1,BE03,Energy,Industrial Machinery/Components,206.63,3510000000.0,68377473024.0,6,-41.2,2026-08-19,active
 BEAM,Beam Therapeutics Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Biological Products (No Diagnostic Substances),29.07,45500000.0,2762945024.0,3,-24.0,2026-08-19,active
 BELFA,Bel Fuse Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Technology,,220.42,42200000.0,3581272576.0,6,-24.9,2026-08-19,active
 BELFB,Bel Fuse Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Technology,,263.87,69400000.0,4188595456.0,6,-21.3,2026-08-19,active
@@ -273,7 +275,7 @@ BHF,"Brighthouse Financial, Inc.",US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Fina
 BHRB,Burke & Herbert Financial Services Corp.,US,NASDAQ,NASDAQ Capital Market,,N,0,,Finance,Major Banks,70.9,9130000.0,1431260544.0,3,-5.58,2026-08-19,active
 BIDU,"Baidu, Inc.",US,NASDAQ,NASDAQ Global Select,,Y,4,BIDU01 BIDU06 BIDU23 BIDU80,Technology,Computer Software: Programming Data Processing,92.87,296000000.0,35163467776.0,8,-43.8,2026-08-19,active
 BIIB,Biogen Inc.,US,NASDAQ,NASDAQ Global Select,SP500,N,0,,Health Care,Biotechnology: Biological Products (No Diagnostic Substances),221.56,201000000.0,31124379648.0,5,-0.266,2026-08-19,active
-BILI,Bilibili Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Technology,EDP Services,17.31,37700000.0,7210853888.0,8,-52.4,2026-08-19,active
+BILI,Bilibili Inc.,US,NASDAQ,NASDAQ Global Select,,Y,1,BILIBILI01,Technology,EDP Services,17.31,37700000.0,7210853888.0,8,-52.4,2026-08-19,active
 BIOA,"BioAge Labs, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,10.75,16500000.0,477327840.0,7,-58.6,2026-08-19,active
 BIRD,"Allbirds, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Consumer Discretionary,Apparel,2.4,789000.0,22455430.0,8,-90.1,2026-08-19,active
 BIYA,Baiya International Group Inc.,US,NASDAQ,NASDAQ Capital Market,,N,0,,Consumer Discretionary,Diversified Commercial Services,2.41,32800000.0,75769096.0,8,-87.3,2026-08-19,active
@@ -281,6 +283,7 @@ BJDX,"Bluejay Diagnostics, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Health Ca
 BJRI,"BJ's Restaurants, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Consumer Discretionary,Restaurants,64.74,36100000.0,1389389440.0,3,-13.2,2026-08-19,active
 BKNG,Booking Holdings Inc. Common Stock,US,NASDAQ,NASDAQ Global Select,SP500+NDX,Y,2,BKNG03 BKNG80,Consumer Discretionary,Transportation Services,213.0,1210000000.0,159946358784.0,5,-7.33,2026-08-19,active
 BKR,Baker Hughes Company,US,NASDAQ,NASDAQ Global Select,SP500+NDX,N,0,,Consumer Discretionary,Oil and Gas Field Machinery,64.48,501000000.0,63809085440.0,5,-8.12,2026-08-19,active
+BKSY,BlackSky Technology Inc.,US,NYSE,NYSE,,Y,1,BKSY03,Technology,Packaged Software,26.84,49100000.0,1098422869.1,,-49.2,2026-08-19,active
 BL,"BlackLine, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Technology,Computer Software: Prepackaged Software,31.43,35200000.0,1826877312.0,1,-47.2,2026-08-19,active
 BLBD,Blue Bird Corporation,US,NASDAQ,NASDAQ Global,,N,0,,Consumer Discretionary,Construction/Ag Equipment/Trucks,62.52,42400000.0,1978544640.0,7,-25.0,2026-08-19,active
 BLD,TopBuild Corp.,US,,,,N,0,,Consumer Discretionary,Engineering & Construction,354.53,437000000.0,9935550464.0,8,-36.6,2026-07-02,ไม่พบใน SymDir · ข้อมูลค้าง
@@ -307,7 +310,7 @@ BR,"Broadridge Financial Solutions, Inc.",US,NYSE,NYSE,SP500,N,0,,Consumer Discr
 BRAI,Braiin Limited,US,NASDAQ,NASDAQ Global,,N,0,,Technology,EDP Services,5.53,630000.0,1137607040.0,8,-83.2,2026-08-19,active
 BRCB,"Black Rock Coffee Bar, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Consumer Discretionary,Restaurants,8.81,2710000.0,177883328.0,1,-71.0,2026-08-19,active
 BRK.A,Berkshire Hathaway Inc.,US,NYSE,NYSE,,N,0,,Finance,,750170.0,118000000.0,1066644406272.0,6,-6.94,2026-08-19,active
-BRK.B,Berkshire Hathaway Inc. New,US,NYSE,NYSE,SP500,N,0,,Finance,,499.62,2200000000.0,1076691337216.0,6,-7.09,2026-08-19,active
+BRK.B,Berkshire Hathaway Inc. New,US,NYSE,NYSE,SP500,Y,2,BRKB23 BRKB80,Finance,,499.62,2200000000.0,1076691337216.0,6,-7.09,2026-08-19,active
 BRKR,Bruker Corporation,US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Industrials,Biotechnology: Laboratory Analytical Instruments,58.65,139000000.0,8826175488.0,4,-10.2,2026-08-19,active
 BRKRP,Bruker Corporation,US,NASDAQ,NASDAQ Global Select,,N,0,,Industrials,Biotechnology: Laboratory Analytical Instruments,434.2,4540000.0,,4,-8.59,2026-08-19,active
 BRO,"Brown & Brown, Inc.",US,NYSE,NYSE,SP500,N,0,,Finance,Specialty Insurers,71.49,170000000.0,23961448448.0,1,-26.7,2026-08-19,active
@@ -372,6 +375,7 @@ CBNK,"Capital Bancorp, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Major 
 CBOE,"Cboe Global Markets, Inc.",US,Cboe BZX,Cboe BZX,SP500,N,0,,Finance,Investment Bankers/Brokers/Service,280.75,286000000.0,29525782528.0,6,-24.2,2026-08-19,active
 CBRE,CBRE Group Inc,US,NYSE,NYSE,SP500,N,0,,Finance,Real Estate,155.07,248000000.0,41681469440.0,2,-11.0,2026-08-19,active
 CBRL,"Cracker Barrel Old Country Store, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Consumer Discretionary,Restaurants,56.07,45500000.0,1294708352.0,3,-9.28,2026-08-19,active
+CBRS,Cerebras Systems Inc.,US,NASDAQ,NASDAQ Global Select,,Y,1,CBRS03,Technology,Packaged Software,208.8,1470000000.0,46739574106.9,,-46.0,2026-08-19,active
 CBSH,"Commerce Bancshares, Inc.",US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Finance,Major Banks,58.87,59400000.0,8443852288.0,3,-3.37,2026-08-19,active
 CCAP,"Crescent Capital BDC, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Finance,Finance: Consumer Services,10.81,2540000.0,417464640.0,8,-23.6,2026-08-19,active
 CCB,Coastal Financial Corporation,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Major Banks,47.49,21200000.0,773946752.0,8,-60.4,2026-08-19,active
@@ -380,6 +384,7 @@ CCC,CCC Intelligent Solutions Holdings Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,
 CCCC,"C4 Therapeutics, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Biological Products (No Diagnostic Substances),4.21,9570000.0,517935840.0,5,-18.6,2026-08-19,active
 CCEP,Coca-Cola Europacific Partners plc,US,NASDAQ,NASDAQ Global Select,NDX,N,0,,Consumer Staples,Beverages (Production/Distribution),106.68,226000000.0,46650687488.0,3,-6.15,2026-08-19,active
 CCI,Crown Castle Inc.,US,NYSE,NYSE,SP500,N,0,,Real Estate,Real Estate Investment Trusts,74.65,308000000.0,33203261440.0,8,-25.2,2026-08-19,active
+CCJ,Cameco Corporation,US,NYSE,NYSE,,Y,1,CCJ23,Basic Materials,Other Metals/Minerals,95.99,315000000.0,41806808733.2,,-29.0,2026-08-19,active
 CCL,Carnival Corporation Ltd.,US,NYSE,NYSE,SP500,N,0,,Consumer Discretionary,Marine Transportation,26.69,493000000.0,37898190848.0,7,-20.7,2026-08-19,active
 CCNE,CNB Financial Corporation,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Major Banks,33.84,5700000.0,1015403840.0,3,-6.44,2026-08-19,active
 CCOI,"Cogent Communications Holdings, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Consumer Discretionary,Telecommunications Equipment,10.365,19400000.0,579249984.0,8,-77.2,2026-08-19,active
@@ -430,7 +435,7 @@ CHTR,"Charter Communications, Inc.",US,NASDAQ,NASDAQ Global Select,SP500,N,0,,Te
 CHY,Calamos Convertible and High Income Fund,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Investment Managers,13.145,2290000.0,1085262592.0,3,-4.8,2026-08-19,active
 CHYM,"Chime Financial, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Finance: Consumer Services,33.07,277000000.0,11963289600.0,5,-1.02,2026-08-19,active
 CI,The Cigna Group,US,NYSE,NYSE,SP500,N,0,,Health Care,Medical Specialities,277.45,505000000.0,73456205824.0,7,-10.6,2026-08-19,active
-CIEN,Ciena Corporation,US,NYSE,NYSE,SP500,N,0,,Utilities,Telecommunications Equipment,399.47,889000000.0,56546148352.0,6,-37.3,2026-08-19,active
+CIEN,Ciena Corporation,US,NYSE,NYSE,SP500,Y,1,CIEN03,Utilities,Telecommunications Equipment,399.47,889000000.0,56546148352.0,6,-37.3,2026-08-19,active
 CIFR,Cipher Digital Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Finance: Consumer Services,15.89,682000000.0,6679919104.0,7,-47.3,2026-08-19,active
 CIGI,Colliers International Group Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Real Estate,109.73,22900000.0,5406273024.0,1,-36.0,2026-08-19,active
 CIIT,"Tianci International, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Energy,Oil & Gas Production,3.5,383000.0,3424560.0,1,-59.7,2026-08-19,active
@@ -519,7 +524,7 @@ CRUS,"Cirrus Logic, Inc.",US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Technology,S
 CRVL,CorVel Corporation,US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Finance,Specialty Insurers,70.78,11400000.0,3169914880.0,2,-24.5,2026-08-19,active
 CRVS,"Corvus Pharmaceuticals, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,15.4,11600000.0,1247513600.0,5,-42.9,2026-08-19,active
 CRWD,"CrowdStrike Holdings, Inc.",US,NASDAQ,NASDAQ Global Select,SP500+NDX,Y,2,CRWD06 CRWD80,Technology,Computer Software: Prepackaged Software,201.63,1500000000.0,217805651968.0,8,-74.3,2026-08-19,active
-CRWV,"CoreWeave, Inc.",US,NASDAQ,NASDAQ Global Select,NDX,Y,1,CRWV03,Technology,Computer Software: Prepackaged Software,90.87,2980000000.0,48113852416.0,8,-40.7,2026-08-19,active
+CRWV,"CoreWeave, Inc.",US,NASDAQ,NASDAQ Global Select,NDX,Y,2,CRWV03 CRWV23,Technology,Computer Software: Prepackaged Software,90.87,2980000000.0,48113852416.0,8,-40.7,2026-08-19,active
 CSCO,"Cisco Systems, Inc.",US,NASDAQ,NASDAQ Global Select,SP500+NDX+DOW30,Y,1,CSCO06,Telecommunications,Computer Communications Equipment,110.55,2690000000.0,435725598720.0,6,-15.2,2026-08-19,active
 CSGP,"CoStar Group, Inc.",US,NASDAQ,NASDAQ Global Select,SP500,N,0,,Finance,Real Estate,33.73,222000000.0,12715100160.0,1,-63.3,2026-08-19,active
 CSIQ,Canadian Solar Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Technology,Semiconductors,15.78,25900000.0,1004192960.0,1,-54.4,2026-08-19,active
@@ -570,11 +575,11 @@ DD,"DuPont de Nemours, Inc.",US,NYSE,NYSE,SP500,N,0,,Industrials,Major Chemicals
 DDOG,"Datadog, Inc.",US,NASDAQ,NASDAQ Global Select,SP500+NDX,Y,1,DDOG19,Technology,Computer Software: Prepackaged Software,233.52,1350000000.0,83851198464.0,6,-20.2,2026-08-19,active
 DE,Deere & Company,US,NYSE,NYSE,SP500,N,0,,Industrials,Industrial Machinery/Components,580.63,636000000.0,165304287232.0,6,-13.6,2026-08-19,active
 DECK,Deckers Outdoor Corporation,US,NYSE,NYSE,SP500,N,0,,Consumer Discretionary,Shoe Manufacturing,91.57,241000000.0,12470172672.0,8,-27.0,2026-08-19,active
-DELL,Dell Technologies Inc.,US,NYSE,NYSE,SP500,Y,1,DELL19,Technology,Computer Manufacturing,437.55,2620000000.0,310025584640.0,3,-14.9,2026-08-19,active
+DELL,Dell Technologies Inc.,US,NYSE,NYSE,SP500,Y,2,DELL19 DELL23,Technology,Computer Manufacturing,437.55,2620000000.0,310025584640.0,3,-14.9,2026-08-19,active
 DEVS,DevvStream Corp.,US,,,,N,0,,Industrials,,0.1371,1660000.0,5365357.0,8,-98.6,2026-07-17,ไม่พบใน SymDir · ข้อมูลค้าง
 DFDV,DeFi Development Corp.,US,NASDAQ,NASDAQ Capital Market,,N,0,,Finance,Finance: Consumer Services,3.42,2050000.0,106012448.0,1,-83.2,2026-08-19,active
 DFTX,"Definium Therapeutics, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Medicinal Chemicals and Botanical Products,45.82,96600000.0,6081447424.0,5,-7.81,2026-08-19,active
-DG,Dollar General Corporation,US,NYSE,NYSE,SP500,N,0,,Consumer Discretionary,Department/Specialty Retail Stores,122.31,240000000.0,27924062208.0,3,-21.9,2026-08-19,active
+DG,Dollar General Corporation,US,NYSE,NYSE,SP500,Y,1,DOLLARG80,Consumer Discretionary,Department/Specialty Retail Stores,122.31,240000000.0,27924062208.0,3,-21.9,2026-08-19,active
 DGII,Digi International Inc.,US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Telecommunications,Computer Communications Equipment,76.09,27700000.0,3075315968.0,3,-12.4,2026-08-19,active
 DGX,Quest Diagnostics Incorporated,US,NYSE,NYSE,SP500,N,0,,Health Care,Medical Specialities,241.76,236000000.0,26075705344.0,5,-0.26,2026-08-19,active
 DGXX,Digi Power X Inc.,US,NASDAQ,NASDAQ Capital Market,,N,0,,Finance,Finance: Consumer Services,3.58,14000000.0,412910624.0,7,-61.1,2026-08-19,active
@@ -651,7 +656,7 @@ EH,EHang Holdings Limited,US,NASDAQ,NASDAQ Global,,N,0,,Industrials,Aerospace,5.
 EHC,Encompass Health Corporation,US,NYSE,NYSE,SP400,N,0,,Health Care,Hospital/Nursing Management,121.74,111000000.0,12010062848.0,5,-4.53,2026-08-19,active
 EIKN,"Eikon Therapeutics, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Biological Products (No Diagnostic Substances),12.01,4470000.0,534889664.0,2,-31.0,2026-08-19,active
 EIX,Edison International,US,NYSE,NYSE,SP500,N,0,,Utilities,Electric Utilities: Central,73.44,248000000.0,27479568384.0,3,-10.0,2026-08-19,active
-EL,"Estee Lauder Companies, Inc. (The)",US,NYSE,NYSE,SP500,N,0,,Consumer Discretionary,Package Goods/Cosmetics,98.01,256000000.0,31150540800.0,2,-18.9,2026-08-19,active
+EL,"Estee Lauder Companies, Inc. (The)",US,NYSE,NYSE,SP500,Y,1,ESTEE80,Consumer Discretionary,Package Goods/Cosmetics,98.01,256000000.0,31150540800.0,2,-18.9,2026-08-19,active
 ELAB,PMGC Holdings Inc.,US,NASDAQ,NASDAQ Capital Market,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,0.5603,362000.0,4134813.0,8,-99.8,2026-08-19,active
 ELAN,Elanco Animal Health Incorporated,US,NYSE,NYSE,SP400,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,24.5,206000000.0,11821971456.0,3,-12.4,2026-08-19,active
 ELDN,"Eledon Pharmaceuticals, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,3.55,3480000.0,288477088.0,6,-22.8,2026-08-19,active
@@ -674,7 +679,7 @@ ENTG,"Entegris, Inc.",US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Industrials,Plas
 ENVX,Enovix Corporation,US,NASDAQ,NASDAQ Global Select,,N,0,,Miscellaneous,Industrial Machinery/Components,3.4,36000000.0,687971136.0,8,-76.1,2026-08-19,active
 EOG,"EOG Resources, Inc.",US,NYSE,NYSE,SP500,N,0,,Energy,Oil & Gas Production,149.48,405000000.0,78406623232.0,5,-1.35,2026-08-19,active
 EOLS,"Evolus, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,8.6,7400000.0,568033792.0,5,-1.04,2026-08-19,active
-EOSE,"Eos Energy Enterprises, Inc.",US,NASDAQ,NASDAQ Capital Market,,Y,1,EOSE03,Miscellaneous,Industrial Machinery/Components,3.74,104000000.0,1327392512.0,8,-81.2,2026-08-19,active
+EOSE,"Eos Energy Enterprises, Inc.",US,NASDAQ,NASDAQ Capital Market,,Y,2,EOSE03 EOSE23,Miscellaneous,Industrial Machinery/Components,3.74,104000000.0,1327392512.0,8,-81.2,2026-08-19,active
 EPRT,"Essential Properties Realty Trust, Inc.",US,NYSE,NYSE,SP600,N,0,,Real Estate,Real Estate Investment Trusts,31.1,51800000.0,6730893824.0,6,-9.54,2026-08-19,active
 EPSM,Epsium Enterprise Limited,US,NASDAQ,NASDAQ Capital Market,,N,0,,Consumer Staples,Beverages (Production/Distribution),1.5,21900.0,21074164.0,1,-99.0,2026-08-19,active
 EQIX,"Equinix, Inc.",US,NASDAQ,NASDAQ Global Select,SP500,N,0,,Real Estate,Real Estate Investment Trusts,1077.08,660000000.0,108303032320.0,5,-4.17,2026-08-19,active
@@ -697,7 +702,7 @@ ESQ,"Esquire Financial Holdings, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Fin
 ESS,"Essex Property Trust, Inc.",US,NYSE,NYSE,SP500,N,0,,Real Estate,Real Estate Investment Trusts,287.36,123000000.0,19512143872.0,4,-5.27,2026-08-19,active
 ESTA,Establishment Labs Holdings Inc.,US,NASDAQ,NASDAQ Capital Market,,N,0,,Health Care,Industrial Specialties,75.36,45500000.0,2326472448.0,6,-22.8,2026-08-19,active
 ESTC,Elastic N.V.,US,NYSE,NYSE,,N,0,,Technology,Computer Software: Prepackaged Software,87.34,166000000.0,9079135232.0,5,-9.09,2026-08-19,active
-ETN,"Eaton Corporation, PLC",US,NYSE,NYSE,SP500,Y,1,ETN23,Technology,Industrial Machinery/Components,424.67,991000000.0,174267301888.0,3,-11.2,2026-08-19,active
+ETN,"Eaton Corporation, PLC",US,NYSE,NYSE,SP500,Y,2,ETN23 ETN03,Technology,Industrial Machinery/Components,424.67,991000000.0,174267301888.0,3,-11.2,2026-08-19,active
 ETON,"Eton Pharmaceuticals, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,61.48,33700000.0,1117608192.0,5,-3.68,2026-08-19,active
 ETOR,eToro Group Ltd.,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Investment Bankers/Brokers/Service,28.5,40100000.0,2272884224.0,8,-40.5,2026-08-19,active
 ETR,Entergy Corporation,US,NYSE,NYSE,SP500,N,0,,Utilities,Electric Utilities: Central,107.96,266000000.0,50433531904.0,6,-8.86,2026-08-19,active
@@ -778,6 +783,7 @@ FLY,Firefly Aerospace Inc.,US,NASDAQ,NASDAQ Global,,N,0,,Industrials,Military/Go
 FLYW,Flywire Corporation,US,NASDAQ,NASDAQ Global Select,,N,0,,Consumer Discretionary,Business Services,18.83,37500000.0,2219218432.0,5,-1.54,2026-08-19,active
 FMBH,"First Mid Bancshares, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Finance,Major Banks,50.11,6760000.0,1381969408.0,3,-6.09,2026-08-19,active
 FMNB,Farmers National Banc Corp.,US,NASDAQ,NASDAQ Capital Market,,N,0,,Finance,Major Banks,15.65,6780000.0,956848256.0,3,-4.92,2026-08-19,active
+FN,Fabrinet,US,NYSE,NYSE,,Y,2,FABRINET03 FABRINET23,Technology,Semiconductors,448.55,423000000.0,16073726808.2,,-40.1,2026-08-19,active
 FNKO,"Funko, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Consumer Discretionary,Recreational Games/Products/Toys,5.97,8020000.0,343814016.0,4,-15.2,2026-08-19,active
 FORM,"FormFactor, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Technology,Semiconductors,114.95,152000000.0,10286155776.0,6,-28.3,2026-08-19,active
 FOSL,"Fossil Group, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Consumer Discretionary,Consumer Specialties,5.69,5930000.0,311465440.0,5,-8.96,2026-08-19,active
@@ -795,7 +801,7 @@ FRSH,Freshworks Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Technology,Computer So
 FRST,Primis Financial Corp.,US,NASDAQ,NASDAQ Global,,N,0,,Finance,Major Banks,16.14,3000000.0,413152544.0,3,-4.38,2026-08-19,active
 FRT,Federal Realty Investment Trust,US,NYSE,NYSE,SP500,N,0,,Real Estate,Real Estate Investment Trusts,117.56,109000000.0,10276899840.0,6,-8.31,2026-08-19,active
 FSBC,Five Star Bancorp,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Major Banks,45.18,11500000.0,1130524544.0,6,-10.1,2026-08-19,active
-FSLR,"First Solar, Inc.",US,NASDAQ,NASDAQ Global Select,SP500,N,0,,Technology,Semiconductors,222.4,605000000.0,23412295680.0,7,-30.7,2026-08-19,active
+FSLR,"First Solar, Inc.",US,NASDAQ,NASDAQ Global Select,SP500,Y,1,FSLR03,Technology,Semiconductors,222.4,605000000.0,23412295680.0,7,-30.7,2026-08-19,active
 FSLY,"Fastly, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Technology,Computer Software: Prepackaged Software,23.66,166000000.0,4767848960.0,3,-32.1,2026-08-19,active
 FSS,Federal Signal Corporation,US,NYSE,NYSE,SP600,N,0,,Industrials,Auto Manufacturing,122.63,51900000.0,7682086912.0,3,-8.83,2026-08-19,active
 FSTR,L.B. Foster Company,US,NASDAQ,NASDAQ Global Select,,N,0,,Industrials,Metal Fabrications,37.0,3330000.0,407535648.0,6,-19.2,2026-08-19,active
@@ -803,7 +809,7 @@ FSUN,FirstSun Capital Bancorp,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Major
 FSV,FirstService Corporation,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Real Estate,146.53,34100000.0,6218114560.0,1,-29.7,2026-08-19,active
 FTAI,FTAI Aviation Ltd.,US,NASDAQ,NASDAQ Global Select,,N,0,,Industrials,Misc Corporate Leasing Services,210.91,356000000.0,22200135680.0,7,-34.6,2026-08-19,active
 FTDR,"Frontdoor, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Consumer Discretionary,Diversified Commercial Services,82.28,43900000.0,5712633344.0,4,-11.9,2026-08-19,active
-FTNT,"Fortinet, Inc.",US,NASDAQ,NASDAQ Global Select,SP500+NDX,N,0,,Technology,Computer peripheral equipment,152.85,846000000.0,117401518080.0,3,-11.2,2026-08-19,active
+FTNT,"Fortinet, Inc.",US,NASDAQ,NASDAQ Global Select,SP500+NDX,Y,1,FTNT03,Technology,Computer peripheral equipment,152.85,846000000.0,117401518080.0,3,-11.2,2026-08-19,active
 FTRE,Fortrea Holdings Inc.,US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Health Care,Medical Specialities,18.14,32800000.0,1721310080.0,3,-15.2,2026-08-19,active
 FTV,Fortive Corporation,US,NYSE,NYSE,SP500,N,0,,Industrials,Industrial Machinery/Components,58.9,167000000.0,18610290688.0,6,-8.77,2026-08-19,active
 FULC,"Fulcrum Therapeutics, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,3.91,6760000.0,283062816.0,8,-75.2,2026-08-19,active
@@ -837,7 +843,7 @@ GENB,"Generate Biomedicines, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Health C
 GERN,Geron Corporation,US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,1.59,16600000.0,984734656.0,2,-20.9,2026-08-19,active
 GEV,GE Vernova Inc.,US,NYSE,NYSE,SP500,Y,2,GEV23 GEV80,Industrials,,987.46,2380000000.0,287373950976.0,6,-17.4,2026-08-19,active
 GEVO,"Gevo, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Industrials,Major Chemicals,1.54,5060000.0,395579360.0,8,-48.1,2026-08-19,active
-GFS,GlobalFoundries Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Technology,Semiconductors,48.58,233000000.0,29948094464.0,7,-47.5,2026-08-19,active
+GFS,GlobalFoundries Inc.,US,NASDAQ,NASDAQ Global Select,,Y,1,GFS03,Technology,Semiconductors,48.58,233000000.0,29948094464.0,7,-47.5,2026-08-19,active
 GGAL,Grupo Financiero Galicia S.A.,US,NASDAQ,NASDAQ Capital Market,,N,0,,Finance,Commercial Banks,41.47,33900000.0,7357667840.0,7,-31.4,2026-08-19,active
 GH,"Guardant Health, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Medical Specialities,163.34,349000000.0,21096980480.0,5,-7.5,2026-08-19,active
 GHRS,GH Research PLC,US,NASDAQ,NASDAQ Global,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,29.8,10100000.0,2024261120.0,5,-5.21,2026-08-19,active
@@ -930,6 +936,7 @@ HLIT,Harmonic Inc.,US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Technology,Radio An
 HLMN,Hillman Solutions Corp.,US,NASDAQ,NASDAQ Global,,N,0,,Consumer Discretionary,Industrial Machinery/Components,8.53,13400000.0,1659468672.0,2,-21.4,2026-08-19,active
 HLNE,Hamilton Lane Incorporated,US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Finance,Investment Managers,104.86,71900000.0,6978564096.0,2,-33.4,2026-08-19,active
 HLT,Hilton Worldwide Holdings Inc.,US,NYSE,NYSE,SP500,N,0,,Consumer Discretionary,Hotels/Resorts,334.73,699000000.0,72205328384.0,3,-6.5,2026-08-19,active
+HMC,"Honda Motor Co., Ltd.",US,NYSE,NYSE,,Y,1,HONDA19,Consumer Discretionary,Motor Vehicles,32.5,54300000.0,40899677132.6,,-6.85,2026-08-19,active
 HNRG,Hallador Energy Company,US,NASDAQ,NASDAQ Capital Market,,N,0,,Utilities,Electric Utilities: Central,16.38,13200000.0,743246272.0,1,-33.7,2026-08-19,active
 HNST,"The Honest Company, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Consumer Discretionary,Catalog/Specialty Distribution,5.02,14800000.0,543931776.0,5,-14.0,2026-08-19,active
 HON,Honeywell International Inc.,US,NASDAQ,NASDAQ Global Select,SP500+NDX+DOW30,N,0,,Industrials,Aerospace,221.73,804000000.0,72170405888.0,6,-12.0,2026-08-19,active
@@ -971,7 +978,7 @@ IART,Integra LifeSciences Holdings Corporation,US,NASDAQ,NASDAQ Global Select,SP
 IBCP,Independent Bank Corporation,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Major Banks,36.95,7720000.0,761263744.0,3,-5.67,2026-08-19,active
 IBEX,IBEX Limited,US,NASDAQ,NASDAQ Global,,N,0,,Technology,EDP Services,35.77,3780000.0,478928672.0,5,-16.8,2026-08-19,active
 IBKR,"Interactive Brokers Group, Inc.",US,NASDAQ,NASDAQ Global Select,SP500,N,0,,Finance,Investment Bankers/Brokers/Service,90.54,412000000.0,160720928768.0,3,-7.46,2026-08-19,active
-IBM,International Business Machines Corporation,US,NYSE,NYSE,SP500+DOW30,Y,1,IBM06,Technology,Computer Manufacturing,237.16,1700000000.0,223549652992.0,8,-28.7,2026-08-19,active
+IBM,International Business Machines Corporation,US,NYSE,NYSE,SP500+DOW30,Y,2,IBM06 IBM23,Technology,Computer Manufacturing,237.16,1700000000.0,223549652992.0,8,-28.7,2026-08-19,active
 IBOC,International Bancshares Corporation,US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Finance,Major Banks,71.53,22900000.0,4759352320.0,6,-8.83,2026-08-19,active
 IBRX,"ImmunityBio, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Biological Products (No Diagnostic Substances),8.13,64400000.0,7683812864.0,3,-34.6,2026-08-19,active
 ICE,Intercontinental Exchange Inc.,US,NYSE,NYSE,SP500,N,0,,Finance,Investment Bankers/Brokers/Service,157.24,620000000.0,88273674240.0,2,-12.4,2026-08-19,active
@@ -1010,6 +1017,7 @@ INDB,Independent Bank Corp.,US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Finance,Ma
 INDI,"indie Semiconductor, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Technology,Semiconductors,4.005,30700000.0,995169280.0,4,-33.8,2026-08-19,active
 INDP,"Indaptus Therapeutics, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,0.94,241000.0,124728136.0,8,-89.0,2026-08-19,active
 INDV,"Indivior Pharmaceuticals, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,39.04,94100000.0,4611973632.0,3,-8.81,2026-08-19,active
+INFQ,"Infleqtion, Inc.",US,NYSE,NYSE,,Y,1,INFQ03,Technology,Computer Processing Hardware,12.2,182000000.0,2749355892.9,,-55.6,2026-08-19,active
 INHD,Inno Holdings Inc.,US,NASDAQ,NASDAQ Capital Market,,N,0,,Basic Materials,,7.47,8520000.0,38245104.0,8,-99.9,2026-08-19,active
 INMD,InMode Ltd.,US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Electromedical & Electrotherapeutic Apparatus,15.04,7370000.0,865464320.0,3,-10.2,2026-08-19,active
 INNV,InnovAge Holding Corp.,US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Medical/Nursing Services,10.94,2390000.0,1506674048.0,3,-13.4,2026-08-19,active
@@ -1070,14 +1078,14 @@ JBLU,JetBlue Airways Corporation,US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Consu
 JBSS,"John B. Sanfilippo & Son, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Consumer Staples,Specialty Foods,81.3,11300000.0,1014070656.0,6,-11.7,2026-08-19,active
 JBTM,JBT Marel Corporation,US,NYSE,NYSE,SP600,N,0,,Industrials,Industrial Machinery/Components,115.03,87000000.0,5977765888.0,8,-32.3,2026-08-19,active
 JCAP,"Jefferson Capital, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Finance Companies,23.41,9180000.0,1358113920.0,5,-4.21,2026-08-19,active
-JCI,Johnson Controls International plc,US,NYSE,NYSE,SP500,N,0,,Industrials,Industrial Machinery/Components,144.94,543000000.0,92551233536.0,6,-7.72,2026-08-19,active
+JCI,Johnson Controls International plc,US,NYSE,NYSE,SP500,Y,1,JCI03,Industrials,Industrial Machinery/Components,144.94,543000000.0,92551233536.0,6,-7.72,2026-08-19,active
 JD,"JD.com, Inc.",US,NASDAQ,NASDAQ Global Select,,Y,1,JD80,Consumer Discretionary,Other Specialty Stores,29.35,300000000.0,38489247744.0,7,-17.5,2026-08-19,active
 JDZG,JIADE Limited,US,NASDAQ,NASDAQ Capital Market,,N,0,,Consumer Staples,,4.25,1740000.0,22468000.0,8,-99.6,2026-08-19,active
 JFB,JFB Construction Holdings,US,NASDAQ,NASDAQ Capital Market,,N,0,,Consumer Discretionary,General Bldg Contractors - Nonresidential Bldgs,4.3,1600000.0,89013776.0,8,-75.5,2026-08-19,active
 JJSF,J&J Snack Foods Corp.,US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Consumer Staples,Specialty Foods,90.75,22400000.0,1633613184.0,2,-19.9,2026-08-19,active
 JKHY,"Jack Henry & Associates, Inc.",US,NASDAQ,NASDAQ Global Select,SP500,N,0,,Technology,EDP Services,163.06,145000000.0,10879295488.0,2,-15.0,2026-08-19,active
 JNJ,Johnson & Johnson,US,NYSE,NYSE,SP500+DOW30,Y,1,JNJ03,Health Care,Biotechnology: Pharmaceutical Preparations,273.41,1830000000.0,627417088000.0,5,-1.11,2026-08-19,active
-JOBY,"Joby Aviation, Inc.",US,NYSE,NYSE,,N,0,,Industrials,Aerospace,7.72,267000000.0,8714184704.0,8,-61.4,2026-08-19,active
+JOBY,"Joby Aviation, Inc.",US,NYSE,NYSE,,Y,1,JOBY03,Industrials,Aerospace,7.72,267000000.0,8714184704.0,8,-61.4,2026-08-19,active
 JOUT,Johnson Outdoors Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Consumer Discretionary,Recreational Games/Products/Toys,47.97,2260000.0,502709792.0,5,-10.4,2026-08-19,active
 JOYY,JOYY Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Technology,EDP Services,74.89,20200000.0,3678877440.0,5,-2.33,2026-08-19,active
 JPM,JP Morgan Chase & Co.,US,NYSE,NYSE,SP500+DOW30,Y,2,JPMUS06 JPMUS19,Finance,Major Banks,357.26,2240000000.0,959498878976.0,4,-2.52,2026-08-19,active
@@ -1275,7 +1283,7 @@ MIRM,"Mirum Pharmaceuticals, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Health Care,Bio
 MITK,"Mitek Systems, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Technology,Computer peripheral equipment,18.88,13600000.0,837922496.0,5,-10.3,2026-08-19,active
 MKC,"McCormick & Company, Incorporated",US,NYSE,NYSE,SP500,N,0,,Consumer Staples,Packaged Foods,56.48,150000000.0,14238377984.0,2,-21.3,2026-08-19,active
 MKL,Markel Group Inc.,US,NYSE,NYSE,,N,0,,Finance,Property-Casualty Insurers,1795.04,121000000.0,22887225344.0,8,-18.7,2026-08-19,active
-MKSI,MKS Inc.,US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Industrials,Industrial Machinery/Components,281.6,475000000.0,20710582272.0,6,-37.1,2026-08-19,active
+MKSI,MKS Inc.,US,NASDAQ,NASDAQ Global Select,SP400,Y,1,MKSI03,Industrials,Industrial Machinery/Components,281.6,475000000.0,20710582272.0,6,-37.1,2026-08-19,active
 MKTX,MarketAxess Holdings Inc.,US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Finance,Investment Bankers/Brokers/Service,161.74,256000000.0,5721308672.0,2,-17.0,2026-08-19,active
 MLAB,"Mesa Laboratories, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Industrials,Industrial Machinery/Components,119.72,16600000.0,604018112.0,5,-0.606,2026-08-19,active
 MLCO,Melco Resorts & Entertainment Limited,US,NASDAQ,NASDAQ Global Select,,N,0,,Consumer Discretionary,Hotels/Resorts,5.48,8410000.0,2135603584.0,8,-46.0,2026-08-19,active
@@ -1292,6 +1300,7 @@ MNDY,monday.com Ltd.,US,NASDAQ,NASDAQ Global Select,,N,0,,Technology,Computer So
 MNKD,MannKind Corporation,US,NASDAQ,NASDAQ Global,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,4.395,19600000.0,1229655296.0,2,-32.5,2026-08-19,active
 MNPR,Monopar Therapeutics Inc.,US,NASDAQ,NASDAQ Capital Market,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,123.84,32900000.0,758743936.0,5,-0.785,2026-08-19,active
 MNRO,"Monro, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Consumer Discretionary,Automotive Aftermarket,12.57,15700000.0,361412544.0,8,-45.8,2026-08-19,active
+MNSO,MINISO Group Holding Limited,US,NYSE,NYSE,,Y,1,MNSO80,Consumer Discretionary,Specialty Stores,11.02,6820000.0,3339431621.4,,-58.8,2026-08-19,active
 MNST,Monster Beverage Corporation,US,NASDAQ,NASDAQ Global Select,SP500+NDX,Y,1,MNST06,Consumer Staples,Beverages (Production/Distribution),47.43,521000000.0,91722801152.0,7,-52.7,2026-08-19,active
 MNTS,Momentus Inc.,US,NASDAQ,NASDAQ Capital Market,,N,0,,Industrials,Military/Government/Technical,4.24,5910000.0,91542072.0,8,-87.7,2026-08-19,active
 MO,"Altria Group, Inc.",US,NYSE,NYSE,SP500,N,0,,Health Care,Medicinal Chemicals and Botanical Products,66.03,691000000.0,109435011072.0,6,-14.3,2026-08-19,active
@@ -1307,7 +1316,7 @@ MPC,Marathon Petroleum Corporation,US,NYSE,NYSE,SP500,N,0,,Energy,Integrated oil
 MPLT,"MapLight Therapeutics, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,12.15,19300000.0,563490624.0,8,-69.9,2026-08-19,active
 MPWR,"Monolithic Power Systems, Inc.",US,NASDAQ,NASDAQ Global Select,SP500+NDX,Y,1,MPWR23,Technology,Semiconductors,1300.14,1150000000.0,68898979840.0,6,-24.1,2026-08-19,active
 MQ,"Marqeta, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Technology,Computer Software: Prepackaged Software,15.64,18800000.0,1611449856.0,3,-16.3,2026-08-19,active
-MRAM,"Everspin Technologies, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Technology,Semiconductors,17.44,22700000.0,449257664.0,6,-66.1,2026-08-19,active
+MRAM,"Everspin Technologies, Inc.",US,NASDAQ,NASDAQ Global,,Y,1,MRAM03,Technology,Semiconductors,17.44,22700000.0,449257664.0,6,-66.1,2026-08-19,active
 MRBK,Meridian Corporation,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Major Banks,19.6,1940000.0,239535280.0,6,-8.87,2026-08-19,active
 MRCY,Mercury Systems Inc,US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Technology,Electrical Products,101.25,70900000.0,6806506496.0,6,-21.2,2026-08-19,active
 MRK,"Merck & Company, Inc.",US,NYSE,NYSE,SP500+DOW30,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,152.2,1300000000.0,321768521728.0,5,-0.828,2026-08-19,active
@@ -1335,6 +1344,7 @@ MTRX,Matrix Service Company,US,NASDAQ,NASDAQ Global Select,,N,0,,Consumer Discre
 MTSI,"MACOM Technology Solutions Holdings, Inc.",US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Technology,Semiconductors,269.98,435000000.0,22367135744.0,6,-35.6,2026-08-19,active
 MTZ,"MasTec, Inc.",US,NYSE,NYSE,SP400,N,0,,Industrials,Water Sewer Pipeline Comm & Power Line Construction,272.07,464000000.0,21848565760.0,7,-38.4,2026-08-19,active
 MU,"Micron Technology, Inc.",US,NASDAQ,NASDAQ Global Select,SP500+NDX,Y,5,MICRON01 MICRON03 MICRON19 MICRON23 MICRON80,Technology,Semiconductors,937.105,36100000000.0,1062487916544.0,5,-25.3,2026-08-19,active
+MUFG,"Mitsubishi UFJ Financial Group, Inc.",US,NYSE,NYSE,,Y,2,MUFG19 MUFG23,Finance,Major Banks,21.7,68800000.0,247070650980,,-6.65,2026-08-19,active
 MVIS,"MicroVision, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Technology,Industrial Machinery/Components,1.77,5000000.0,88492936.0,6,-63.9,2026-08-19,active
 MVST,"Microvast Holdings, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Miscellaneous,Industrial Machinery/Components,0.8008,5490000.0,322432192.0,8,-88.8,2026-08-19,active
 MWH,"SOLV Energy, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Industrials,Military/Government/Technical,29.97,55800000.0,6065529856.0,8,-38.1,2026-08-19,active
@@ -1397,7 +1407,7 @@ NNOX,Nano-X Imaging Ltd.,US,NASDAQ,NASDAQ Global,,N,0,,Health Care,Medical Elect
 NOC,Northrop Grumman Corporation,US,NYSE,NYSE,SP500,N,0,,Industrials,Industrial Machinery/Components,582.84,377000000.0,82800017408.0,2,-24.4,2026-08-19,active
 NOVT,Novanta Inc.,US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Miscellaneous,Industrial Machinery/Components,145.94,66900000.0,6381748224.0,6,-17.3,2026-08-19,active
 NOVTU,Novanta Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Miscellaneous,Industrial Machinery/Components,61.93,1730000.0,,6,-19.5,2026-08-19,active
-NOW,"ServiceNow, Inc.",US,NYSE,NYSE,SP500,Y,1,NOW19,Technology,Computer Software: Prepackaged Software,127.2,2730000000.0,129170718720.0,2,-34.7,2026-08-19,active
+NOW,"ServiceNow, Inc.",US,NYSE,NYSE,SP500,Y,2,NOW19 NOW23,Technology,Computer Software: Prepackaged Software,127.2,2730000000.0,129170718720.0,2,-34.7,2026-08-19,active
 NPCE,"NeuroPace, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Health Care,Medical/Dental Instruments,14.64,3600000.0,507314912.0,7,-25.3,2026-08-19,active
 NPT,Texxon Holding Limited,US,NASDAQ,NASDAQ Capital Market,,N,0,,Consumer Discretionary,Specialty Chemicals,3.6,122000.0,80087848.0,1,-83.9,2026-08-19,active
 NRC,NRC Health,US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Commercial Physical & Biological Resarch,21.98,2510000.0,486851648.0,5,-7.18,2026-08-19,active
@@ -1412,7 +1422,7 @@ NSSC,"Napco Security Technologies, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,
 NTAP,"NetApp, Inc.",US,NASDAQ,NASDAQ Global Select,SP500,N,0,,Technology,Electronic Components,194.48,465000000.0,38163640320.0,4,-6.97,2026-08-19,active
 NTCL,NetClass Technology Inc,US,NASDAQ,NASDAQ Capital Market,,N,0,,Technology,Computer Software: Prepackaged Software,2.53,184000.0,3460683.0,6,-68.4,2026-08-19,active
 NTCT,"NetScout Systems, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Technology,EDP Services,38.35,23300000.0,2788325376.0,6,-15.3,2026-08-19,active
-NTES,"NetEase, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Technology,Computer Software: Prepackaged Software,127.25,96500000.0,79871205376.0,4,-18.6,2026-08-19,active
+NTES,"NetEase, Inc.",US,NASDAQ,NASDAQ Global Select,,Y,1,NETEASE80,Technology,Computer Software: Prepackaged Software,127.25,96500000.0,79871205376.0,4,-18.6,2026-08-19,active
 NTGR,"NETGEAR, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Utilities,Telecommunications Equipment,21.6,9820000.0,656373312.0,8,-41.4,2026-08-19,active
 NTLA,"Intellia Therapeutics, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Health Care,Biotechnology: In Vitro & In Vivo Diagnostic Substances,13.28,40100000.0,1625469696.0,2,-53.0,2026-08-19,active
 NTNX,"Nutanix, Inc.",US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Technology,Computer Software: Prepackaged Software,65.42,150000000.0,17424859136.0,5,-20.6,2026-08-19,active
@@ -1429,6 +1439,7 @@ NVCR,NovoCure Limited,US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Medical/D
 NVDA,NVIDIA Corporation,US,NASDAQ,NASDAQ Global Select,SP500+NDX+DOW30,Y,6,NVDA01 NVDA03 NVDA06 NVDA19 NVDA23 NVDA80,Technology,Semiconductors,217.56,25000000000.0,5456991354880.0,4,-7.92,2026-08-19,active
 NVEC,NVE Corporation,US,NASDAQ,NASDAQ Capital Market,,N,0,,Technology,Semiconductors,111.28,28700000.0,586506496.0,3,-17.5,2026-08-19,active
 NVMI,Nova Ltd.,US,NASDAQ,NASDAQ Global Select,,N,0,,Technology,Electronic Components,385.33,227000000.0,13298791424.0,7,-37.4,2026-08-19,active
+NVO,Novo Nordisk A/S,US,NYSE,NYSE,,Y,1,NOVOB80,Health Care,Pharmaceuticals: Major,46.27,639000000.0,206811613350.7,,-27.9,2026-08-19,active
 NVR,"NVR, Inc.",US,NYSE,NYSE,SP500,N,0,,Consumer Discretionary,Homebuilding,6418.86,210000000.0,16851688448.0,1,-25.5,2026-08-19,active
 NVTS,Navitas Semiconductor Corporation,US,NASDAQ,NASDAQ Global,,Y,2,NVTS03 NVTS23,Technology,Semiconductors,12.83,187000000.0,3806743040.0,7,-62.5,2026-08-19,active
 NWBI,"Northwest Bancshares, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Finance,Major Banks,15.27,15900000.0,2291105280.0,3,-5.51,2026-08-19,active
@@ -1455,7 +1466,7 @@ ODFL,"Old Dominion Freight Line, Inc.",US,NASDAQ,NASDAQ Global Select,SP500+NDX,
 OFIX,Orthofix Medical Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Medical/Dental Instruments,10.48,4050000.0,420385152.0,8,-38.3,2026-08-19,active
 OHI,"Omega Healthcare Investors, Inc.",US,NYSE,NYSE,SP400,N,0,,Real Estate,Real Estate Investment Trusts,46.92,91000000.0,14828165120.0,6,-9.22,2026-08-19,active
 OKE,"ONEOK, Inc.",US,NYSE,NYSE,SP500,N,0,,Utilities,Oil & Gas Production,96.01,356000000.0,59878813696.0,5,-1.93,2026-08-19,active
-OKLO,Oklo Inc.,US,NYSE,NYSE,,Y,1,OKLO23,Utilities,Electric Utilities: Central,42.94,413000000.0,8275925504.0,8,-77.8,2026-08-19,active
+OKLO,Oklo Inc.,US,NYSE,NYSE,,Y,2,OKLO23 OKLO03,Utilities,Electric Utilities: Central,42.94,413000000.0,8275925504.0,8,-77.8,2026-08-19,active
 OKTA,"Okta, Inc.",US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Technology,Computer Software: Prepackaged Software,141.21,362000000.0,25014353920.0,3,-10.1,2026-08-19,active
 OLED,Universal Display Corporation,US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Technology,Electrical Products,86.54,66700000.0,4181143296.0,1,-43.1,2026-08-19,active
 OLLI,"Ollie's Bargain Outlet Holdings, Inc.",US,NASDAQ,NASDAQ Global,SP400,N,0,,Consumer Discretionary,Department/Specialty Retail Stores,79.39,100000000.0,4624072192.0,1,-43.5,2026-08-19,active
@@ -1471,7 +1482,8 @@ OMF,"OneMain Holdings, Inc.",US,NYSE,NYSE,,N,0,,Finance,Finance: Consumer Servic
 ON,ON Semiconductor Corporation,US,NASDAQ,NASDAQ Global Select,SP500,Y,1,ON23,Technology,Semiconductors,76.58,824000000.0,30919135232.0,7,-43.2,2026-08-19,active
 ONB,Old National Bancorp,US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Finance,Major Banks,25.91,102000000.0,10356169728.0,6,-5.3,2026-08-19,active
 ONC,BeOne Medicines Ltd.,US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,376.86,141000000.0,39307689984.0,5,-2.17,2026-08-19,active
-ONDS,Ondas Inc,US,NASDAQ,NASDAQ Capital Market,,N,0,,Technology,Radio And Television Broadcasting And Communications Equipment,8.9,673000000.0,5169204224.0,4,-41.8,2026-08-19,active
+ONDS,Ondas Inc,US,NASDAQ,NASDAQ Capital Market,,Y,1,ONDS03,Technology,Radio And Television Broadcasting And Communications Equipment,8.9,673000000.0,5169204224.0,4,-41.8,2026-08-19,active
+ONON,On Holding AG,US,NYSE,NYSE,,Y,1,ONON03,Consumer Discretionary,Apparel/Footwear,30.36,184000000.0,9999749781.8,,-40.6,2026-08-19,active
 ONTO,Onto Innovation Inc.,US,NYSE,NYSE,SP400,N,0,,Industrials,Industrial Machinery/Components,299.5,365000000.0,20275255296.0,3,-22.5,2026-08-19,active
 OPCH,"Option Care Health, Inc.",US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Health Care,Medical/Nursing Services,23.35,62200000.0,3586607616.0,1,-36.5,2026-08-19,active
 OPEN,Opendoor Technologies Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Real Estate,3.58,177000000.0,3476505856.0,8,-67.1,2026-08-19,active
@@ -1481,7 +1493,7 @@ OPRT,Oportun Financial Corporation,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,
 OPTX,"Syntec Optics Holdings, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Technology,Electronic Components,8.425,3030000.0,354865760.0,6,-43.5,2026-08-19,active
 ORA,"Ormat Technologies, Inc.",US,NYSE,NYSE,SP400,N,0,,Utilities,Electric Utilities: Central,110.32,93700000.0,7057389056.0,8,-24.6,2026-08-19,active
 ORBS,Eightco Holdings Inc.,US,NASDAQ,NASDAQ Capital Market,,N,0,,Consumer Discretionary,,0.7444,8390000.0,289146208.0,1,-99.1,2026-08-19,active
-ORCL,Oracle Corporation,US,NYSE,NYSE,SP500,Y,4,ORCL01 ORCL06 ORCL19 ORCL80,Technology,Computer Software: Prepackaged Software,143.81,4250000000.0,411302428672.0,8,-58.1,2026-08-19,active
+ORCL,Oracle Corporation,US,NYSE,NYSE,SP500,Y,5,ORCL01 ORCL06 ORCL19 ORCL80 ORCL23,Technology,Computer Software: Prepackaged Software,143.81,4250000000.0,411302428672.0,8,-58.1,2026-08-19,active
 ORIC,"ORIC Pharmaceuticals, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,14.65,21500000.0,1442844928.0,5,-1.88,2026-08-19,active
 ORKA,"Oruka Therapeutics, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Health Care,Biotechnology: In Vitro & In Vivo Diagnostic Substances,109.69,78500000.0,7262542336.0,5,-5.04,2026-08-19,active
 ORLY,"O'Reilly Automotive, Inc.",US,NASDAQ,NASDAQ Global Select,SP500+NDX,N,0,,Consumer Discretionary,Auto & Home Supply Stores,91.2,559000000.0,73655877632.0,1,-16.1,2026-08-19,active
@@ -1501,7 +1513,7 @@ OVID,Ovid Therapeutics Inc.,US,NASDAQ,NASDAQ Capital Market,,N,0,,Health Care,Bi
 OWL,Blue Owl Capital Inc.,US,NYSE,NYSE,,N,0,,Finance,Investment Managers,11.77,242000000.0,30920026112.0,2,-35.6,2026-08-19,active
 OXLC,Oxford Lane Capital Corp.,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Investment Managers,9.3,9310000.0,898376768.0,1,-33.8,2026-08-19,active
 OXSQ,Oxford Square Capital Corp.,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Blank Checks,1.42,2630000.0,160484592.0,8,-23.1,2026-08-19,active
-OXY,Occidental Petroleum Corporation,US,NYSE,NYSE,SP500,N,0,,Energy,Oil & Gas Production,60.09,478000000.0,60068208640.0,5,-10.5,2026-08-19,active
+OXY,Occidental Petroleum Corporation,US,NYSE,NYSE,SP500,Y,1,OXY03,Energy,Oil & Gas Production,60.09,478000000.0,60068208640.0,5,-10.5,2026-08-19,active
 OZK,Bank OZK,US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Finance,Major Banks,49.48,53200000.0,5723384832.0,6,-7.32,2026-08-19,active
 P,"Everpure, Inc.",US,NYSE,NYSE,SP400,N,0,,Technology,Electronic Components,112.0,285000000.0,36358451200.0,5,-5.96,2026-08-19,active
 PAA,"Plains All American Pipeline, L.P.",US,NASDAQ,NASDAQ Global Select,,N,0,,Energy,Natural Gas Distribution,23.99,64000000.0,17067653120.0,5,-2.56,2026-08-19,active
@@ -1542,10 +1554,10 @@ PEP,"Pepsico, Inc.",US,NASDAQ,NASDAQ Global Select,SP500+NDX,Y,1,PEP80,Consumer 
 PERI,Perion Network Ltd.,US,NASDAQ,NASDAQ Global Select,,N,0,,Technology,EDP Services,9.72,3230000.0,403529248.0,2,-13.8,2026-08-19,active
 PESI,"Perma-Fix Environmental Services, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Industrials,Environmental Services,17.3,8700000.0,367077472.0,4,-18.9,2026-08-19,active
 PFBC,Preferred Bank,US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Finance,Major Banks,103.13,9090000.0,1278240000.0,6,-7.44,2026-08-19,active
-PFE,"Pfizer, Inc.",US,NYSE,NYSE,SP500,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,28.24,1060000000.0,152694259712.0,5,-0.686,2026-08-19,active
+PFE,"Pfizer, Inc.",US,NYSE,NYSE,SP500,Y,1,PFIZER19,Health Care,Biotechnology: Pharmaceutical Preparations,28.24,1060000000.0,152694259712.0,5,-0.686,2026-08-19,active
 PFG,Principal Financial Group Inc,US,NASDAQ,NASDAQ Global Select,SP500,N,0,,Finance,Accident &Health Insurance,111.64,159000000.0,24607045632.0,3,-4.26,2026-08-19,active
 PFIS,Peoples Financial Services Corp.,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Major Banks,69.65,4210000.0,714840320.0,3,-5.07,2026-08-19,active
-PG,Procter & Gamble Company (The),US,NYSE,NYSE,SP500+DOW30,N,0,,Consumer Discretionary,Package Goods/Cosmetics,144.38,1320000000.0,332672860160.0,8,-13.0,2026-08-19,active
+PG,Procter & Gamble Company (The),US,NYSE,NYSE,SP500+DOW30,Y,1,PNG80,Consumer Discretionary,Package Goods/Cosmetics,144.38,1320000000.0,332672860160.0,8,-13.0,2026-08-19,active
 PGC,Peapack-Gladstone Financial Corporation,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Commercial Banks,45.06,8850000.0,822045120.0,6,-8.3,2026-08-19,active
 PGEN,"Precigen, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,7.16,39000000.0,2345130752.0,5,-2.19,2026-08-19,active
 PGNY,"Progyny, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Health Care,Misc Health and Biotechnology Services,25.53,33000000.0,1972646016.0,6,-22.8,2026-08-19,active
@@ -1558,7 +1570,7 @@ PHVS,Pharvaris N.V.,US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnolo
 PI,"Impinj, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Technology,Industrial Machinery/Components,164.98,83600000.0,5135280128.0,4,-33.2,2026-08-19,active
 PICS,PicS N.V.,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Finance: Consumer Services,10.5,4470000.0,1330864128.0,8,-47.4,2026-08-19,active
 PKG,Packaging Corporation of America,US,NYSE,NYSE,SP500,N,0,,Consumer Discretionary,Containers/Packaging,252.91,163000000.0,22539196416.0,4,-2.72,2026-08-19,active
-PL,Planet Labs PBC,US,NYSE,NYSE,,N,0,,Technology,Radio And Television Broadcasting And Communications Equipment,22.62,133000000.0,8799578112.0,7,-56.3,2026-08-19,active
+PL,Planet Labs PBC,US,NYSE,NYSE,,Y,1,PLAB03,Technology,Radio And Television Broadcasting And Communications Equipment,22.62,133000000.0,8799578112.0,7,-56.3,2026-08-19,active
 PLAB,"Photronics, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Technology,Semiconductors,30.7,26200000.0,1964670336.0,8,-45.2,2026-08-19,active
 PLAY,"Dave & Buster's Entertainment, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Consumer Discretionary,Restaurants,9.97,14000000.0,346843296.0,8,-62.1,2026-08-19,active
 PLBC,Plumas Bancorp,US,NASDAQ,NASDAQ Capital Market,,N,0,,Finance,Finance Companies,60.97,3120000.0,442384640.0,3,-4.73,2026-08-19,active
@@ -1626,12 +1638,12 @@ PURR,Hyperliquid Strategies Inc.,US,NASDAQ,NASDAQ Capital Market,,N,0,,Finance,F
 PUSA,Aureus Greenway Holdings Inc.,US,NASDAQ,NASDAQ Capital Market,,N,0,,Consumer Discretionary,Hotels/Resorts,3.37,2110000.0,92955360.0,8,-59.2,2026-08-19,active
 PVLA,"Palvella Therapeutics, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,149.96,25200000.0,2249584640.0,3,-7.08,2026-08-19,active
 PWP,Perella Weinberg Partners,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Finance: Consumer Services,16.63,21200000.0,1799853696.0,8,-35.4,2026-08-19,active
-PWR,"Quanta Services, Inc.",US,NYSE,NYSE,SP500,N,0,,Industrials,Engineering & Construction,677.41,792000000.0,88289386496.0,4,-14.1,2026-08-19,active
+PWR,"Quanta Services, Inc.",US,NYSE,NYSE,SP500,Y,1,PWR03,Industrials,Engineering & Construction,677.41,792000000.0,88289386496.0,4,-14.1,2026-08-19,active
 PYPL,"PayPal Holdings, Inc.",US,NASDAQ,NASDAQ Global Select,SP500+NDX,Y,1,PYPL06,Industrials,Diversified Commercial Services,61.25,666000000.0,51729719296.0,5,-22.0,2026-08-19,active
 PZZA,"Papa John's International, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Consumer Discretionary,Restaurants,23.27,49000000.0,766087680.0,8,-56.6,2026-08-19,active
 Q,"Qnity Electronics, Inc.",US,NYSE,NYSE,SP500,N,0,,Technology,Semiconductors,126.04,248000000.0,29770377216.0,7,-28.9,2026-08-19,active
-QBTS,D-Wave Quantum Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Technology,EDP Services,19.32,349000000.0,6037251072.0,8,-58.7,2026-08-19,active
-QCOM,QUALCOMM Incorporated,US,NASDAQ,NASDAQ Global Select,SP500+NDX,Y,1,QCOM06,Technology,Radio And Television Broadcasting And Communications Equipment,161.91,1830000000.0,170043375616.0,7,-37.5,2026-08-19,active
+QBTS,D-Wave Quantum Inc.,US,NASDAQ,NASDAQ Global Select,,Y,1,QBTS03,Technology,EDP Services,19.32,349000000.0,6037251072.0,8,-58.7,2026-08-19,active
+QCOM,QUALCOMM Incorporated,US,NASDAQ,NASDAQ Global Select,SP500+NDX,Y,2,QCOM06 QCOM23,Technology,Radio And Television Broadcasting And Communications Equipment,161.91,1830000000.0,170043375616.0,7,-37.5,2026-08-19,active
 QCRH,"QCR Holdings, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Finance,Major Banks,101.14,12800000.0,1744985344.0,3,-6.45,2026-08-19,active
 QDEL,QuidelOrtho Corporation,US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Health Care,Biotechnology: In Vitro & In Vivo Diagnostic Substances,13.8,23200000.0,1034803136.0,8,-61.2,2026-08-19,active
 QFIN,"Qfin Holdings, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Finance: Consumer Services,11.79,14900000.0,1520681088.0,8,-61.8,2026-08-19,active
@@ -1652,6 +1664,7 @@ QUIK,QuickLogic Corporation,US,NASDAQ,NASDAQ Capital Market,,N,0,,Technology,Sem
 QURE,uniQure N.V.,US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,48.76,59800000.0,3372594944.0,5,-31.8,2026-08-19,active
 QXO,"QXO, Inc.",US,NYSE,NYSE,,N,0,,Consumer Discretionary,RETAIL: Building Materials,14.11,273000000.0,15659344896.0,8,-48.9,2026-08-19,active
 RAAQ,Real Asset Acquisition Corp.,US,,,,N,0,,Finance,Blank Checks,13.42,9220000.0,308660000.0,5,-0.593,2026-07-01,ไม่พบใน SymDir · ข้อมูลค้าง
+RACE,Ferrari N.V.,US,NYSE,NYSE,,Y,1,FERRARI80,Consumer Discretionary,Motor Vehicles,425.41,239000000.0,93495007057.0,,-15.7,2026-08-19,active
 RAL,Ralliant Corporation,US,NYSE,NYSE,SP600,N,0,,Industrials,Industrial Machinery/Components,66.51,117000000.0,7904122368.0,6,-11.8,2026-08-19,active
 RAPP,"Rapport Therapeutics, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,49.07,12400000.0,2275130368.0,5,-1.66,2026-08-19,active
 RARE,Ultragenyx Pharmaceutical Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,26.24,51000000.0,2576127232.0,8,-34.2,2026-08-19,active
@@ -1686,7 +1699,7 @@ RGC,Regencell Bioscience Holdings Limited,US,NASDAQ,NASDAQ Capital Market,,N,0,,
 RGEN,Repligen Corporation,US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Health Care,Biotechnology: Biological Products (No Diagnostic Substances),176.36,183000000.0,9415154688.0,5,-1.95,2026-08-19,active
 RGLD,"Royal Gold, Inc.",US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Industrials,Precious Metals,248.14,162000000.0,19784800256.0,2,-18.8,2026-08-19,active
 RGNX,REGENXBIO Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Biological Products (No Diagnostic Substances),12.02,11500000.0,793478592.0,5,-25.8,2026-08-19,active
-RGTI,"Rigetti Computing, Inc.",US,NASDAQ,NASDAQ Capital Market,,Y,1,RGTI03,Technology,EDP Services,17.0,325000000.0,6281527296.0,8,-70.8,2026-08-19,active
+RGTI,"Rigetti Computing, Inc.",US,NASDAQ,NASDAQ Capital Market,,Y,2,RGTI03 RGTI23,Technology,EDP Services,17.0,325000000.0,6281527296.0,8,-70.8,2026-08-19,active
 RHP,"Ryman Hospitality Properties, Inc. (REIT)",US,NYSE,NYSE,SP600,N,0,,Real Estate,Real Estate Investment Trusts,128.34,123000000.0,8853443584.0,4,-6.63,2026-08-19,active
 RIGL,"Rigel Pharmaceuticals, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,46.96,12600000.0,782125888.0,5,-10.1,2026-08-19,active
 RILY,"BRC Group Holdings, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Finance,Investment Managers,7.23,4270000.0,303106144.0,7,-35.7,2026-08-19,active
@@ -1822,8 +1835,10 @@ SLRC,SLR Investment Corp.,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Finance/I
 SLS,"SELLAS Life Sciences Group, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,13.85,69900000.0,2645488896.0,5,-12.8,2026-08-19,active
 SMBC,"Southern Missouri Bancorp, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Finance,Banks,74.01,7620000.0,850498048.0,6,-7.33,2026-08-19,active
 SMCI,"Super Micro Computer, Inc.",US,NASDAQ,NASDAQ Global Select,SP500,Y,1,SMCI03,Technology,Computer Manufacturing,36.58,1920000000.0,24199520256.0,2,-37.8,2026-08-19,active
+SMFG,"Sumitomo Mitsui Financial Group, Inc.",US,NYSE,NYSE,,Y,1,SMFG19,Finance,Major Banks,24.7,46500000.0,158553262402.5,,-7.39,2026-08-19,active
 SMMT,Summit Therapeutics Inc.,US,NASDAQ,NASDAQ Global,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,13.11,64900000.0,10649958400.0,8,-56.4,2026-08-19,active
 SMPL,The Simply Good Foods Company,US,NASDAQ,NASDAQ Capital Market,SP600,N,0,,Consumer Staples,Packaged Foods,11.45,23700000.0,1000270080.0,8,-62.3,2026-08-19,active
+SMR,NuScale Power Corporation,US,NYSE,NYSE,,Y,2,SMR03 SMR23,Industrials,Electrical Products,8.95,304000000.0,3845851418.3,,-84.4,2026-08-19,active
 SMTC,Semtech Corporation,US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Technology,Semiconductors,125.36,297000000.0,13073767424.0,6,-29.3,2026-08-19,active
 SMTK,"SmartKem, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Technology,Semiconductors,0.0872,649000.0,2239526.0,8,-97.7,2026-08-19,active
 SNA,Snap-On Incorporated,US,NYSE,NYSE,SP500,N,0,,Consumer Discretionary,Industrial Machinery/Components,393.93,144000000.0,20753956864.0,6,-6.88,2026-08-19,active
@@ -1836,18 +1851,20 @@ SNEX,StoneX Group Inc.,US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Finance,Investm
 SNGX,"Soligenix, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,0.3811,78500.0,5781427.0,8,-91.1,2026-08-19,active
 SNOW,Snowflake Inc.,US,NYSE,NYSE,,Y,2,SNOW06 SNOW23,Technology,Computer Software: Prepackaged Software,325.01,1520000000.0,116935909376.0,5,-4.95,2026-08-19,active
 SNPS,"Synopsys, Inc.",US,NASDAQ,NASDAQ Global Select,SP500+NDX,Y,2,SYNP03 SYNP23,Technology,Computer Software: Prepackaged Software,401.24,650000000.0,80708534272.0,8,-35.8,2026-08-19,active
-SNY,Sanofi,US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,45.83,139000000.0,109814988800.0,2,-8.18,2026-08-19,active
+SNY,Sanofi,US,NASDAQ,NASDAQ Global Select,,Y,1,SANOFI80,Health Care,Biotechnology: Pharmaceutical Preparations,45.83,139000000.0,109814988800.0,2,-8.18,2026-08-19,active
 SO,Southern Company (The),US,NYSE,NYSE,SP500,N,0,,Utilities,Electric Utilities: Central,92.19,503000000.0,108755320832.0,7,-7.12,2026-08-19,active
 SOBR,"SOBR Safe, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Consumer Discretionary,Newspapers/Magazines,0.5393,258000.0,1534070.0,8,-86.4,2026-08-19,active
 SOFI,"SoFi Technologies, Inc.",US,NASDAQ,NASDAQ Global Select,,Y,1,SOFI23,Finance,Finance: Consumer Services,18.42,1120000000.0,23403255808.0,1,-43.7,2026-08-19,active
 SOLS,Solstice Advanced Materials Inc.,US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Industrials,Aerospace,57.34,167000000.0,9951788032.0,8,-36.8,2026-08-19,active
 SOLV,Solventum Corporation,US,NYSE,NYSE,SP500,N,0,,Health Care,Medical/Dental Instruments,87.81,112000000.0,14947345408.0,5,-2.43,2026-08-19,active
 SONO,"Sonos, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Consumer Staples,Consumer Electronics/Appliances,16.28,30200000.0,1925826048.0,5,-17.9,2026-08-19,active
+SONY,Sony Group Corporation,US,NYSE,NYSE,,Y,1,SONY80,Technology,Computer Processing Hardware,23.52,142000000.0,138194455325.2,,-22.5,2026-08-19,active
 SOUN,"SoundHound AI, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Technology,Computer Software: Prepackaged Software,7.16,245000000.0,3321941760.0,1,-67.7,2026-08-19,active
 SPFI,"South Plains Financial, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Major Banks,44.21,5390000.0,857744384.0,3,-5.82,2026-08-19,active
 SPG,"Simon Property Group, Inc.",US,NYSE,NYSE,SP500,N,0,,Real Estate,Real Estate Investment Trusts,223.18,298000000.0,84075216896.0,3,-6.42,2026-08-19,active
 SPGI,S&P Global Inc.,US,NYSE,NYSE,SP500,N,0,,Finance,Finance: Consumer Services,426.66,888000000.0,125779369984.0,1,-23.1,2026-08-19,active
 SPHL,Springview Holdings Ltd,US,NASDAQ,NASDAQ Capital Market,,N,0,,Consumer Discretionary,Homebuilding,2.57,73200.0,6152588.0,8,-89.8,2026-08-19,active
+SPOT,Spotify Technology S.A.,US,NYSE,NYSE,,Y,1,SPOT06,Technology,Internet Software/Services,533.26,1110000000.0,109789844756.6,,-28.4,2026-08-19,active
 SPPL,Simpple Ltd.,US,NASDAQ,NASDAQ Capital Market,,N,0,,Consumer Discretionary,Diversified Commercial Services,2.2,243000.0,21529608.0,8,-68.6,2026-08-19,active
 SPRB,"Spruce Biosciences, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,52.96,2310000.0,127155248.0,1,-77.9,2026-08-19,active
 SPRC,SciSparc Ltd.,US,NASDAQ,NASDAQ Capital Market,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,6.86,4440000.0,3777671.0,1,-91.4,2026-08-19,active
@@ -1879,6 +1896,7 @@ STGW,Stagwell Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Consumer Discretionary,A
 STI,"Solidion Technology, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Miscellaneous,Industrial Machinery/Components,7.44,926000.0,62739120.0,8,-83.8,2026-08-19,active
 STIM,"Neuronetics, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Health Care,Medical/Dental Instruments,3.14,8870000.0,239259296.0,5,-17.4,2026-08-19,active
 STLD,"Steel Dynamics, Inc.",US,NASDAQ,NASDAQ Global Select,SP500,N,0,,Industrials,Steel/Iron Ore,231.01,284000000.0,38497927168.0,6,-20.0,2026-08-19,active
+STM,STMicroelectronics N.V.,US,NYSE,NYSE,,Y,1,STM03,Technology,Semiconductors,50.7,611000000.0,45803901048.9,,-37.7,2026-08-19,active
 STNE,StoneCo Ltd.,US,NASDAQ,NASDAQ Global Select,,N,0,,Technology,EDP Services,9.47,44600000.0,2731452928.0,8,-42.5,2026-08-19,active
 STOK,"Stoke Therapeutics, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,33.03,26600000.0,2127430272.0,5,-17.9,2026-08-19,active
 STRA,"Strategic Education, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Real Estate,Other Consumer Services,82.77,25900000.0,1855841408.0,5,-7.76,2026-08-19,active
@@ -1909,7 +1927,7 @@ SWMR,"Swarmer, Inc",US,NASDAQ,NASDAQ Capital Market,,N,0,,Technology,Computer So
 SYBT,"Stock Yards Bancorp, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Major Banks,81.94,15100000.0,2641401344.0,3,-8.16,2026-08-19,active
 SYF,Synchrony Financial,US,NYSE,NYSE,SP500,N,0,,Finance,Finance: Consumer Services,79.62,239000000.0,26273695744.0,5,-9.58,2026-08-19,active
 SYK,Stryker Corporation,US,NYSE,NYSE,SP500,N,0,,Health Care,Medical/Dental Instruments,339.98,807000000.0,132643397632.0,2,-13.7,2026-08-19,active
-SYM,Symbotic Inc.,US,NASDAQ,NASDAQ Global,,Y,1,SYM23,Industrials,Industrial Machinery/Components,42.02,75600000.0,24493060096.0,8,-52.2,2026-08-19,active
+SYM,Symbotic Inc.,US,NASDAQ,NASDAQ Global,,Y,2,SYM23 SYM03,Industrials,Industrial Machinery/Components,42.02,75600000.0,24493060096.0,8,-52.2,2026-08-19,active
 SYNA,Synaptics Incorporated,US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Technology,Semiconductors,100.98,67800000.0,4303332352.0,6,-32.3,2026-08-19,active
 SYRE,"Spyre Therapeutics, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,108.92,84900000.0,9178006528.0,5,-1.14,2026-08-19,active
 SYY,Sysco Corporation,US,NYSE,NYSE,SP500,N,0,,Consumer Discretionary,Food Distributors,82.46,298000000.0,40135454720.0,3,-9.55,2026-08-19,active
@@ -1928,7 +1946,7 @@ TBRG,"TruBridge, Inc.",US,,,,N,0,,Technology,EDP Services,26.24,6760000.0,393577
 TCBI,"Texas Capital Bancshares, Inc.",US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Finance,Major Banks,98.2,44000000.0,4362652672.0,6,-9.66,2026-08-19,active
 TCBK,TriCo Bancshares,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Major Banks,55.79,16000000.0,1855662848.0,6,-9.59,2026-08-19,active
 TCMD,"Tactile Systems Technology, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Health Care,Medical/Dental Instruments,23.6,9350000.0,557019712.0,7,-37.5,2026-08-19,active
-TCOM,Trip.com Group Limited,US,NASDAQ,NASDAQ Global Select,,N,0,,Consumer Discretionary,Business Services,46.51,131000000.0,28701964288.0,1,-41.1,2026-08-19,active
+TCOM,Trip.com Group Limited,US,NASDAQ,NASDAQ Global Select,,Y,2,TRIPCOM23 TRIPCOM80,Consumer Discretionary,Business Services,46.51,131000000.0,28701964288.0,1,-41.1,2026-08-19,active
 TCPC,BlackRock TCP Capital Corp.,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Finance/Investors Services,4.09,3190000.0,343162368.0,1,-32.6,2026-08-19,active
 TDG,Transdigm Group Inc.,US,NYSE,NYSE,SP500,N,0,,Industrials,Military/Government/Technical,1222.91,531000000.0,67598217216.0,8,-16.4,2026-08-19,active
 TDIC,Dreamland Limited,US,NASDAQ,NASDAQ Capital Market,,N,0,,Consumer Discretionary,Other Consumer Services,2.64,608000.0,4189344.0,8,-93.3,2026-08-19,active
@@ -1962,8 +1980,10 @@ TKO,"TKO Group Holdings, Inc.",US,NYSE,NYSE,SP500,N,0,,Consumer Discretionary,Se
 TLN,Talen Energy Corporation,US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Utilities,Electric Utilities: Central,322.35,294000000.0,17492060160.0,7,-28.6,2026-08-19,active
 TLRY,"Tilray Brands, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Medicinal Chemicals and Botanical Products,4.83,21900000.0,616362496.0,1,-79.2,2026-08-19,active
 TLS,Telos Corporation,US,NASDAQ,NASDAQ Global,,N,0,,Technology,EDP Services,4.43,2030000.0,328094496.0,8,-47.0,2026-08-19,active
+TM,Toyota Motor Corporation,US,NYSE,NYSE,,Y,1,TOYOTA80,Consumer Discretionary,Motor Vehicles,190.55,90700000.0,220175242955.2,,-23.4,2026-08-19,active
 TMC,TMC the metals company Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Basic Materials,Metal Mining,3.97,20900000.0,2269006336.0,8,-65.0,2026-08-19,active
 TMDX,"TransMedics Group, Inc.",US,NASDAQ,NASDAQ Global,SP600,N,0,,Health Care,Biotechnology: Electromedical & Electrotherapeutic Apparatus,93.97,80600000.0,3071524352.0,1,-39.8,2026-08-19,active
+TME,Tencent Music Entertainment Group,US,NYSE,NYSE,,Y,1,TME23,Technology,Internet Software/Services,8.66,84000000.0,12517310537.5,,-67.5,2026-08-19,active
 TMO,Thermo Fisher Scientific Inc,US,NYSE,NYSE,SP500,N,0,,Industrials,Industrial Machinery/Components,613.54,1210000000.0,219629895680.0,5,-4.54,2026-08-19,active
 TMUS,"T-Mobile US, Inc.",US,NASDAQ,NASDAQ Global Select,SP500+NDX,N,0,,Telecommunications,Telecommunications Equipment,182.36,888000000.0,190002331648.0,8,-29.0,2026-08-19,active
 TNDM,"Tandem Diabetes Care, Inc.",US,NASDAQ,NASDAQ Global,SP600,N,0,,Health Care,Medical/Dental Instruments,23.46,46500000.0,1609355392.0,5,-20.9,2026-08-19,active
@@ -1996,7 +2016,7 @@ TRV,"The Travelers Companies, Inc.",US,NYSE,NYSE,SP500+DOW30,Y,1,TRVUS06,Finance
 TRVI,"Trevi Therapeutics, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,18.81,29900000.0,2632953344.0,5,-6.97,2026-08-19,active
 TSAT,Telesat Corporation,US,NASDAQ,NASDAQ Global Select,,N,0,,Industrials,Metal Fabrications,46.09,14100000.0,2597185280.0,6,-25.1,2026-08-19,active
 TSCO,Tractor Supply Company,US,NASDAQ,NASDAQ Global Select,SP500,N,0,,Consumer Discretionary,RETAIL: Building Materials,35.44,425000000.0,18668869632.0,1,-42.7,2026-08-19,active
-TSEM,Tower Semiconductor Ltd.,US,NASDAQ,NASDAQ Global Select,,N,0,,Technology,Semiconductors,226.46,486000000.0,30007535616.0,6,-29.2,2026-08-19,active
+TSEM,Tower Semiconductor Ltd.,US,NASDAQ,NASDAQ Global Select,,Y,2,TSEMI03 TSEMI23,Technology,Semiconductors,226.46,486000000.0,30007535616.0,6,-29.2,2026-08-19,active
 TSHA,"Taysha Gene Therapies, Inc.",US,NASDAQ,NASDAQ Global Select,,N,0,,Health Care,Biotechnology: Biological Products (No Diagnostic Substances),6.43,15900000.0,1919571584.0,5,-11.9,2026-08-19,active
 TSLA,"Tesla, Inc.",US,NASDAQ,NASDAQ Global Select,SP500+NDX,Y,4,TSLA01 TSLA03 TSLA23 TSLA80,Industrials,Auto Manufacturing,351.12,12700000000.0,1351811596288.0,8,-29.6,2026-08-19,active
 TSN,"Tyson Foods, Inc.",US,NYSE,NYSE,SP500,N,0,,Consumer Staples,Meat/Poultry/Fish,58.55,192000000.0,19838087168.0,8,-15.0,2026-08-19,active
@@ -2046,14 +2066,14 @@ URBN,"Urban Outfitters, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Consumer
 URGN,UroGen Pharma Ltd.,US,NASDAQ,NASDAQ Global,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,50.29,43700000.0,2383465472.0,5,-1.02,2026-08-19,active
 URI,"United Rentals, Inc.",US,NYSE,NYSE,SP500,N,0,,Consumer Discretionary,Diversified Commercial Services,1117.04,544000000.0,71817248768.0,3,-5.15,2026-08-19,active
 UROY,Uranium Royalty Corp.,US,NASDAQ,NASDAQ Capital Market,,N,0,,Finance,Investment Bankers/Brokers/Service,4.19,11900000.0,1539511936.0,2,-24.1,2026-08-19,active
-USAR,"USA Rare Earth, Inc.",US,NASDAQ,NASDAQ Global,,N,0,,Basic Materials,Metal Mining,18.09,205000000.0,4505296896.0,8,-58.9,2026-08-19,active
+USAR,"USA Rare Earth, Inc.",US,NASDAQ,NASDAQ Global,,Y,1,USAR03,Basic Materials,Metal Mining,18.09,205000000.0,4505296896.0,8,-58.9,2026-08-19,active
 USAU,U.S. Gold Corp.,US,NASDAQ,NASDAQ Capital Market,,N,0,,Basic Materials,Metal Mining,15.66,3490000.0,258408208.0,2,-34.1,2026-08-19,active
 USB,U.S. Bancorp,US,NYSE,NYSE,SP500,N,0,,Finance,Major Banks,62.82,418000000.0,101070798848.0,3,-4.93,2026-08-19,active
 USLM,"United States Lime & Minerals, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Industrials,Mining & Quarrying of Nonmetallic Minerals (No Fuels),119.44,19500000.0,3422521856.0,2,-15.5,2026-08-19,active
 UTHR,United Therapeutics Corporation,US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,529.14,272000000.0,21433765888.0,6,-13.2,2026-08-19,active
 UVSP,Univest Financial Corporation,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Major Banks,41.67,11800000.0,1184042368.0,6,-8.34,2026-08-19,active
 UZX,Linkage Global Inc,US,NASDAQ,NASDAQ Capital Market,,N,0,,Consumer Discretionary,Catalog/Specialty Distribution,0.118,1050000.0,9920728.0,8,-96.2,2026-08-19,active
-V,Visa Inc.,US,NYSE,NYSE,SP500+DOW30,N,0,,Consumer Discretionary,Business Services,365.54,2570000000.0,679885275136.0,5,-2.25,2026-08-19,active
+V,Visa Inc.,US,NYSE,NYSE,SP500+DOW30,Y,2,VISA06 VISA80,Consumer Discretionary,Business Services,365.54,2570000000.0,679885275136.0,5,-2.25,2026-08-19,active
 VC,Visteon Corporation,US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Consumer Discretionary,Auto Parts:O.E.M.,105.86,48300000.0,2817969408.0,6,-17.2,2026-08-19,active
 VCEL,Vericel Corporation,US,NASDAQ,NASDAQ Global,SP600,N,0,,Health Care,Biotechnology: Biological Products (No Diagnostic Substances),43.57,21500000.0,2266404864.0,3,-11.7,2026-08-19,active
 VCIG,VCI Global Limited,US,NASDAQ,NASDAQ Capital Market,,N,0,,Consumer Discretionary,Diversified Commercial Services,0.2461,451000.0,2626702.0,8,-100.0,2026-08-19,active
@@ -2104,7 +2124,7 @@ VSEC,VSE Corporation,US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Consumer Discreti
 VSECU,VSE Corporation,US,NASDAQ,NASDAQ Global Select,,N,0,,Industrials,,58.15,2760000.0,,5,-14.6,2026-08-19,active
 VSME,VS MEDIA Holdings Limited,US,NASDAQ,NASDAQ Capital Market,,N,0,,Consumer Discretionary,Publishing,1.16,125000.0,3363020.0,8,-98.2,2026-08-19,active
 VSNT,"Versant Media Group, Inc.",US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Industrials,Broadcasting,39.26,67900000.0,5115891712.0,2,-32.8,2026-08-19,active
-VST,Vistra Corp.,US,NYSE,NYSE,SP500,N,0,,Utilities,Electric Utilities: Central,142.7,679000000.0,49039659008.0,8,-34.9,2026-08-19,active
+VST,Vistra Corp.,US,NYSE,NYSE,SP500,Y,1,VST03,Utilities,Electric Utilities: Central,142.7,679000000.0,49039659008.0,8,-34.9,2026-08-19,active
 VSTM,"Verastem, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,7.295,13400000.0,595907456.0,2,-35.2,2026-08-19,active
 VTR,"Ventas, Inc.",US,NYSE,NYSE,SP500,N,0,,Real Estate,Real Estate Investment Trusts,91.85,318000000.0,46944849920.0,3,-9.6,2026-08-19,active
 VTRS,Viatris Inc.,US,NASDAQ,NASDAQ Global Select,SP500,N,0,,Health Care,Biotechnology: Pharmaceutical Preparations,16.245,182000000.0,18423398400.0,6,-11.7,2026-08-19,active
@@ -2125,7 +2145,7 @@ WBD,"Warner Bros. Discovery, Inc. - Series A",US,NASDAQ,NASDAQ Global Select,SP5
 WBTN,WEBTOON Entertainment Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Consumer Discretionary,Publishing,8.54,3430000.0,1124366208.0,8,-62.0,2026-08-19,active
 WCT,Wellchange Holdings Company Limited,US,NASDAQ,NASDAQ Capital Market,,N,0,,Technology,Computer Software: Prepackaged Software,0.91,1810000.0,4122637.0,8,-96.4,2026-08-19,active
 WDAY,"Workday, Inc.",US,NASDAQ,NASDAQ Global Select,SP500+NDX,N,0,,Technology,EDP Services,198.42,929000000.0,47216386048.0,2,-20.6,2026-08-19,active
-WDC,Western Digital Corporation,US,NASDAQ,NASDAQ Global Select,SP500+NDX,N,0,,Technology,Electronic Components,462.09,4210000000.0,184753078272.0,6,-42.2,2026-08-19,active
+WDC,Western Digital Corporation,US,NASDAQ,NASDAQ Global Select,SP500+NDX,Y,1,WDC03,Technology,Electronic Components,462.09,4210000000.0,184753078272.0,6,-42.2,2026-08-19,active
 WDFC,WD-40 Company,US,NASDAQ,NASDAQ Global Select,SP600,N,0,,Industrials,Major Chemicals,223.23,25100000.0,3120404736.0,6,-25.0,2026-08-19,active
 WEC,"WEC Energy Group, Inc.",US,NYSE,NYSE,SP500,N,0,,Utilities,Power Generation,109.34,271000000.0,35934666752.0,7,-8.81,2026-08-19,active
 WELL,Welltower Inc.,US,NYSE,NYSE,SP500,N,0,,Real Estate,Real Estate Investment Trusts,235.73,740000000.0,165926125568.0,4,-7.63,2026-08-19,active
@@ -2180,6 +2200,7 @@ XOMA,XOMA Royalty Corporation,US,,,,N,0,,Health Care,Biotechnology: Pharmaceutic
 XOS,"Xos, Inc.",US,NASDAQ,NASDAQ Capital Market,,N,0,,Consumer Discretionary,Auto Parts:O.E.M.,2.9,29200000.0,41231772.0,5,-64.9,2026-08-19,active
 XP,XP Inc.,US,NASDAQ,NASDAQ Global Select,,N,0,,Finance,Investment Bankers/Brokers/Service,16.53,66000000.0,8193778176.0,1,-27.6,2026-08-19,active
 XPEL,"XPEL, Inc.",US,NASDAQ,NASDAQ Capital Market,SP600,N,0,,Industrials,Industrial Specialties,51.07,11900000.0,1352069504.0,5,-8.66,2026-08-19,active
+XPEV,XPeng Inc.,US,NYSE,NYSE,,Y,1,XPENG03,Consumer Discretionary,Motor Vehicles,11.88,83000000.0,11201656753.5,,-57.9,2026-08-19,active
 XPO,"XPO, Inc.",US,NYSE,NYSE,SP400,N,0,,Consumer Discretionary,Transportation Services,197.43,204000000.0,22989928448.0,6,-14.9,2026-08-19,active
 XRAY,DENTSPLY SIRONA Inc.,US,NASDAQ,NASDAQ Global Select,SP400,N,0,,Health Care,Medical/Dental Instruments,11.03,62000000.0,2308517888.0,8,-25.3,2026-08-19,active
 XRX,Xerox Holdings Corporation,US,NASDAQ,NASDAQ Global Select,,N,0,,Technology,Computer peripheral equipment,2.85,13200000.0,412327584.0,7,-30.8,2026-08-19,active
