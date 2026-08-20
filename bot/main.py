@@ -11,10 +11,12 @@ from bot.config import PROJECT_ROOT, load_config
 from bot.formatter import (
     format_breakouts,
     format_lookup,
+    format_open_report,
     format_reminders,
     format_scan,
     format_weekly,
 )
+from bot.openbell import build_open_report, fetch_yahoo_quote, in_open_window
 from bot.lookup import LOOKUP_MAX, SymbolNotCovered, lookup_symbol, parse_tickers
 from bot.nasdaq_cal import fetch_nasdaq_earnings
 from bot.reminders import build_reminders
@@ -112,7 +114,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Push อัตโนมัติ: อังคาร–เสาร์ 08:30 น.\n"
         "เตือนวันงบ: ทุกวัน 08:25 น.\n"
         "เตือนทะลุแนว (High 5วัน/3ด.ก่อนงบ): อังคาร–เสาร์ 08:20 น.\n"
-        "สรุปผลรายสัปดาห์: อาทิตย์ 09:00 น."
+        "สรุปผลรายสัปดาห์: อาทิตย์ 09:00 น.\n"
+        "ยืนยันเปิดตลาด US (หุ้นที่ติดตาม): ~30 นาทีหลังเปิด"
     )
 
 
@@ -257,6 +260,35 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
         logger.exception("breakout job failed")
 
 
+async def openbell_job(context: ContextTypes.DEFAULT_TYPE):
+    """หลังตลาด US เปิด ~30 นาที: ยืนยันว่าหุ้นที่ติดตาม gap ยังอยู่ไหม
+
+    ตั้งยิง 21:00 และ 22:00 ไทย — in_open_window เลือกรอบที่ตรงฤดู (DST) เอง
+    """
+    if not in_open_window(datetime.now(TZ)):
+        return
+    symbols = all_watched()
+    if not symbols:
+        return
+    try:
+        client = FMPClient(api_key=CONFIG.fmp_api_key,
+                           max_api_calls=len(symbols) + 2)
+
+        def get_quote(sym):
+            client.saw_402 = False
+            q = client.get_quote(sym)
+            if q is None and getattr(client, "saw_402", False):
+                q = fetch_yahoo_quote(sym)
+            return q
+
+        items = await asyncio.to_thread(build_open_report, symbols, get_quote)
+        msg = format_open_report(items)
+        if msg:
+            await context.bot.send_message(chat_id=CONFIG.chat_id, text=msg)
+    except Exception:
+        logger.exception("openbell job failed")
+
+
 def _weekly_get_prices(client, sym):
     """ราคาสำหรับสรุปรายสัปดาห์ — FMP ก่อน, 402 → yahoo (แบบเดียวกับ lookup)"""
     client.saw_402 = False
@@ -321,6 +353,9 @@ def main():
     app.job_queue.run_daily(breakout_job, time=time(8, 20, tzinfo=TZ))
     # สรุปผลรายสัปดาห์ เช้าวันอาทิตย์ (เช็ค weekday ใน callback)
     app.job_queue.run_daily(weekly_job, time=time(9, 0, tzinfo=TZ))
+    # ยืนยันเปิดตลาด US: ยิงสองรอบ in_open_window เลือกรอบที่ห่างเปิด 20-80 นาที
+    app.job_queue.run_daily(openbell_job, time=time(21, 0, tzinfo=TZ))
+    app.job_queue.run_daily(openbell_job, time=time(22, 0, tzinfo=TZ))
     logger.info("bot starting")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 

@@ -145,6 +145,25 @@ def format_breakouts(snaps):
     return "\n".join(lines)
 
 
+def format_open_report(items):
+    """ยืนยันช่วงเปิดตลาด US สำหรับหุ้นที่ติดตาม — None ถ้าไม่มีข้อมูล"""
+    if not items:
+        return None
+    lines = ["🇺🇸 ตลาด US เปิดแล้ว ~30 นาที (หุ้นที่ติดตาม)"]
+    for it in items:
+        icon = "🟢" if it["day_pct"] >= 0 else "🔴"
+        line = f"{icon} {it['symbol']} {it['price']:,.2f} ({_signed(it['day_pct'])})"
+        if it.get("gap_pct") is not None:
+            line += f" · gap {_signed(it['gap_pct'])}"
+        if it.get("above_open") is True:
+            line += " · เหนือราคาเปิด ✅"
+        elif it.get("above_open") is False:
+            line += " · ต่ำกว่าราคาเปิด ⚠️"
+        lines.append(line)
+    lines.append("\n(ราคาระหว่างวัน อาจดีเลย์ ~15 นาที)")
+    return "\n".join(lines)
+
+
 def format_weekly(items):
     """สรุปผลหุ้นที่เคยแจ้ง (PEAD drift) — None ถ้าไม่มีสัญญาณในช่วงที่ดู"""
     if not items:

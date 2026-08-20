@@ -304,6 +304,20 @@ class FMPClient:
             return data
         return None
 
+    def get_quote(self, symbol: str) -> Optional[dict]:
+        """Fetch a live quote for one symbol (stable/quote, no caching).
+
+        Returns:
+            Dict with price/open/previousClose etc., or None on failure.
+        """
+        data = self._rate_limited_get(
+            f"{self.STABLE_URL}/quote", {"symbol": symbol}, quiet=True
+        )
+        if (isinstance(data, list) and data and isinstance(data[0], dict)
+                and data[0].get("price") is not None):
+            return data[0]
+        return None
+
     def get_historical_prices(self, symbol: str, days: int = 250) -> Optional[list[dict]]:
         """Fetch historical daily OHLCV data for a symbol.
 

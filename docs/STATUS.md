@@ -25,6 +25,7 @@ Telegram bot (`@Sakuro_usbot`) คัดกรองหุ้น US "อาก�
 | Watchlist + เตือนวันงบ (20 ส.ค. ค่ำ) | พิมพ์ `ติดตาม NVDA` / `เลิกติดตาม NVDA` / `ติดตาม` (ดูรายชื่อ, สูงสุด 20 ตัว, เก็บใน `watchlist.json` — gitignored) · job ทุกวัน 08:25 เช็คหุ้นที่ติดตามตัวไหนงบวันนี้/พรุ่งนี้แล้วเตือนพร้อม BMO/AMC (1 API call/ตัว/วัน) — `bot/watchlist.py` + `bot/reminders.py` + `format_reminders` |
 | เตือนทะลุแนว + auto-watch (20 ส.ค. ดึก) | job 08:20 อังคาร–เสาร์: หุ้นที่ติดตาม (manual+auto) ตัวไหน "เพิ่งทะลุ" High 5วัน/3ด.ก่อนงบ (ปิดข้ามแนวแต่เมื่อวานยังไม่ข้าม — กันเตือนซ้ำ) → แจ้งพร้อมวอลุ่ม/DR — `detect_new_breaks` ใน levels.py + `new_breaks` ใน snapshot + `format_breakouts` · หุ้นเกรด A/B จากสแกนเข้า watchlist เองอัตโนมัติ 30 วัน (`auto_watch.json` — gitignored, เพดาน 20 ตัวเก่าสุดหลุด, `เลิกติดตาม` เอาออกได้) |
 | สรุปผลรายสัปดาห์ (20 ส.ค. ดึก) | job อาทิตย์ 09:00 + พิมพ์ `สรุป` ได้ทุกเมื่อ: หุ้น A/B ที่แจ้งใน 30 วัน (อ่านจาก `reports/scan_*.json`, dedup ต่อ symbol+รอบงบ นับครั้งแรกที่แจ้ง) → +/-% ตั้งแต่วันแจ้ง, จำนวนวัน, 🛑 ถ้า low เคยหลุด SL, สรุปเฉลี่ย+อัตราบวก — `bot/weekly.py` + `format_weekly` (1 API call/ตัว, yahoo fallback สำหรับหุ้น 402) |
+| ยืนยันเปิดตลาด US (20 ส.ค. ดึก) | job ยิง 21:00+22:00 ไทย แล้ว `in_open_window` เลือกรอบที่ห่างระฆังเปิด (09:30 America/New_York — DST อัตโนมัติ) 20–80 นาที: quote สดหุ้นที่ติดตาม → ราคา, %วันนี้, gap เปิด, เหนือ/ใต้ราคาเปิด — `bot/openbell.py` + `get_quote` (stable/quote) ใน vendored client + `format_open_report` (yahoo quote fallback สำหรับ 402) |
 
 ## 🔧 บั๊กที่เจอและแก้แล้วระหว่างทาง
 
