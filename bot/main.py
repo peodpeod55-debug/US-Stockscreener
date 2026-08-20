@@ -8,14 +8,24 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 from bot.config import PROJECT_ROOT, load_config
-from bot.formatter import format_lookup, format_reminders, format_scan
+from bot.formatter import (
+    format_breakouts,
+    format_lookup,
+    format_reminders,
+    format_scan,
+)
 from bot.lookup import LOOKUP_MAX, SymbolNotCovered, lookup_symbol, parse_tickers
 from bot.nasdaq_cal import fetch_nasdaq_earnings
 from bot.reminders import build_reminders
 from bot.screener import load_universe, run_scan, save_reports
 from bot.watchlist import (
+    AUTO_WATCH_DAYS,
     WATCHLIST_MAX,
+    active_auto,
     add_symbols,
+    all_watched,
+    auto_add,
+    auto_remove,
     load_watchlist,
     parse_watch_command,
     remove_symbols,
@@ -46,6 +56,14 @@ async def _do_scan_and_send(bot, chat_id, lookback):
     save_reports(scan, messages)
     for msg in messages:
         await bot.send_message(chat_id=chat_id, text=msg)
+    # หุ้นเกรด A/B เข้า watchlist อัตโนมัติ → ได้เตือนทะลุแนว/วันงบต่อเอง
+    added = auto_add([c["symbol"] for c in scan["candidates"]])
+    if added:
+        await bot.send_message(
+            chat_id=chat_id,
+            text=f"➕ ติดตามอัตโนมัติ {AUTO_WATCH_DAYS} วัน: {', '.join(added)}\n"
+                 "จะเตือนเมื่อทะลุแนว High 5 วัน/3 เดือนก่อนงบ · "
+                 "เอาออก: เลิกติดตาม <ticker>")
 
 
 async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -83,33 +101,46 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "เลิกติดตาม NVDA — เอาออก\n"
         "ติดตาม — ดูรายชื่อที่ติดตามอยู่\n"
         "บอทจะเตือนตอนเช้าเมื่อหุ้นที่ติดตาม\n"
-        "มีงบวันนี้/พรุ่งนี้ (บอก BMO/AMC)\n\n"
+        "มีงบวันนี้/พรุ่งนี้ (บอก BMO/AMC)\n"
+        f"หุ้นเกรด A/B จากสแกนเข้าเองอัตโนมัติ {AUTO_WATCH_DAYS} วัน\n\n"
         "Push อัตโนมัติ: อังคาร–เสาร์ 08:30 น.\n"
-        "เตือนวันงบ: ทุกวัน 08:25 น."
+        "เตือนวันงบ: ทุกวัน 08:25 น.\n"
+        "เตือนทะลุแนว (High 5วัน/3ด.ก่อนงบ): อังคาร–เสาร์ 08:20 น."
     )
 
 
 async def _handle_watch_command(update, action, tickers):
     if action == "show":
-        symbols = load_watchlist()
-        if not symbols:
+        manual = load_watchlist()
+        auto = {s: d for s, d in active_auto().items() if s not in manual}
+        if not manual and not auto:
             await update.message.reply_text(
                 "ยังไม่มีหุ้นใน watchlist — พิมพ์ เช่น: ติดตาม NVDA")
             return
-        await update.message.reply_text(
-            f"👀 ติดตามอยู่ {len(symbols)} ตัว: {', '.join(symbols)}\n"
-            "เตือนวันงบทุกเช้า 08:25 · เอาออก: เลิกติดตาม <ticker>")
+        lines = []
+        if manual:
+            lines.append(f"👀 ติดตามอยู่ {len(manual)} ตัว: {', '.join(manual)}")
+        if auto:
+            lines.append(f"🤖 อัตโนมัติจากสแกน A/B ({AUTO_WATCH_DAYS} วัน): "
+                         + ", ".join(f"{s} ({d})" for s, d in auto.items()))
+        lines.append("เตือนวันงบ 08:25 · เตือนทะลุแนว 08:20 · "
+                     "เอาออก: เลิกติดตาม <ticker>")
+        await update.message.reply_text("\n".join(lines))
         return
     if action == "remove":
         if not tickers:
             await update.message.reply_text("ใช้: เลิกติดตาม <ticker> เช่น เลิกติดตาม NVDA")
             return
         r = remove_symbols(tickers)
+        auto_removed = auto_remove(tickers)
+        removed = r["removed"] + [s for s in auto_removed
+                                  if s not in r["removed"]]
+        missing = [s for s in r["missing"] if s not in auto_removed]
         parts = []
-        if r["removed"]:
-            parts.append(f"🗑 เอาออกแล้ว: {', '.join(r['removed'])}")
-        if r["missing"]:
-            parts.append(f"ไม่ได้ติดตามอยู่แล้ว: {', '.join(r['missing'])}")
+        if removed:
+            parts.append(f"🗑 เอาออกแล้ว: {', '.join(removed)}")
+        if missing:
+            parts.append(f"ไม่ได้ติดตามอยู่แล้ว: {', '.join(missing)}")
         await update.message.reply_text("\n".join(parts))
         return
     # action == "add"
@@ -165,8 +196,8 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def reminder_job(context: ContextTypes.DEFAULT_TYPE):
-    """เช้าทุกวัน: เช็คหุ้นใน watchlist ตัวไหนงบวันนี้/พรุ่งนี้แล้วแจ้งเตือน"""
-    symbols = load_watchlist()
+    """เช้าทุกวัน: เช็คหุ้นที่ติดตาม (manual + auto) ตัวไหนงบวันนี้/พรุ่งนี้"""
+    symbols = all_watched()
     if not symbols:
         return
     try:
@@ -179,6 +210,34 @@ async def reminder_job(context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=CONFIG.chat_id, text=msg)
     except Exception:
         logger.exception("reminder job failed")
+
+
+async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
+    """เช้าอังคาร–เสาร์ (หลังได้ EOD คืนก่อน): หุ้นที่ติดตามตัวไหนเพิ่งทะลุแนว"""
+    if datetime.now(TZ).weekday() not in PUSH_WEEKDAYS:
+        return
+    symbols = all_watched()
+    if not symbols:
+        return
+    try:
+        client = FMPClient(api_key=CONFIG.fmp_api_key,
+                           max_api_calls=3 * len(symbols) + 2)
+        universe = load_universe()
+        alerts = []
+        for sym in symbols:
+            try:
+                snap = await asyncio.to_thread(
+                    lookup_symbol, client, sym, universe)
+            except Exception:
+                logger.exception("breakout check %s failed", sym)
+                continue
+            if snap and snap.get("new_breaks"):
+                alerts.append(snap)
+        msg = format_breakouts(alerts)
+        if msg:
+            await context.bot.send_message(chat_id=CONFIG.chat_id, text=msg)
+    except Exception:
+        logger.exception("breakout job failed")
 
 
 async def daily_job(context: ContextTypes.DEFAULT_TYPE):
@@ -204,6 +263,8 @@ def main():
     app.job_queue.run_daily(daily_job, time=time(8, 30, tzinfo=TZ))
     # เตือนวันงบรันทุกวัน (ไม่เว้นอาทิตย์/จันทร์ — งบวันจันทร์ต้องเตือนตั้งแต่อาทิตย์)
     app.job_queue.run_daily(reminder_job, time=time(8, 25, tzinfo=TZ))
+    # เตือนทะลุแนวเฉพาะหลังวันซื้อขาย US (เช็ค weekday ใน callback)
+    app.job_queue.run_daily(breakout_job, time=time(8, 20, tzinfo=TZ))
     logger.info("bot starting")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 

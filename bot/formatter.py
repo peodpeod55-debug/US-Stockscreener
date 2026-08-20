@@ -121,6 +121,30 @@ def format_lookup(s):
     return "\n".join(lines)
 
 
+_BREAK_TH = {"high_5d": "High 5 วันก่อนงบ", "high_3m": "High 3 เดือนก่อนงบ"}
+
+
+def format_breakouts(snaps):
+    """ข้อความเตือนทะลุแนวจาก snapshot ที่ new_breaks ไม่ว่าง — None ถ้าไม่มี"""
+    if not snaps:
+        return None
+    lines = ["🚀 ทะลุแนว! (watchlist)"]
+    for s in snaps:
+        icon = GRADE_ICON.get(s.get("grade"), "⚪")
+        lines.append("")
+        lines.append(f"{icon} {s['symbol']} — {s['name']}")
+        lines.append(f"💰 ปิด {s['price']:,.2f} ({_signed(s['day_change_pct'])})")
+        broke = " · ".join(
+            f"{_BREAK_TH[k]} ({s['levels'][k]:,.2f})" for k in s["new_breaks"])
+        lines.append(f"📈 ทะลุ {broke}")
+        if s.get("vol_ratio") is not None:
+            fire = " 🔥" if s["vol_ratio"] >= 2 else ""
+            lines.append(f"📊 วอลุ่ม {s['vol_ratio']:.1f}x เฉลี่ย 20 วัน{fire}")
+        if s.get("dr_symbols"):
+            lines.append(f"🇹🇭 DR: {s['dr_symbols']}")
+    return "\n".join(lines)
+
+
 _TIMING_TH = {"bmo": "ก่อนเปิดตลาด US", "amc": "หลังปิดตลาด US"}
 _DAYS_TH = {0: "วันนี้", 1: "พรุ่งนี้"}
 

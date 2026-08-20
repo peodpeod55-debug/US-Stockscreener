@@ -14,7 +14,7 @@ if str(ETA_DIR) not in sys.path:
 
 from analyze_earnings_trades import analyze_stock, normalize_timing  # noqa: E402
 
-from bot.levels import compute_levels  # noqa: E402
+from bot.levels import compute_levels, detect_new_breaks  # noqa: E402
 
 LOOKUP_MAX = 5                  # เพดานจำนวนหุ้นต่อหนึ่งข้อความ (คุมงบ API)
 RECENT_EARNINGS_DAYS = 60       # งบใหม่กว่านี้ (วันปฏิทิน) ถึงคำนวณสัญญาณหลังงบ
@@ -115,7 +115,7 @@ def build_snapshot(symbol, prices, meta=None, earnings=None, today=None):
         "days_since_earnings": None, "days_to_earnings": None,
         "since_earnings_pct": None, "reaction_pct": None, "timing": "unknown",
         "levels": None, "score": None, "grade": None,
-        "pending_reaction": False,
+        "pending_reaction": False, "new_breaks": [],
     }
 
     if not earnings:
@@ -150,10 +150,12 @@ def build_snapshot(symbol, prices, meta=None, earnings=None, today=None):
         snap["levels"] = levels
         if levels is None:
             snap["pending_reaction"] = True  # งบเพิ่งออก ยังไม่มีวันตอบรับ
-        elif len(prices) >= MIN_BARS_FOR_SCORE:
-            analysis = analyze_stock(prices, earn_bar_date, timing)
-            snap["score"] = analysis["composite"]["composite_score"]
-            snap["grade"] = analysis["composite"]["grade"]
+        else:
+            snap["new_breaks"] = detect_new_breaks(prices, levels)
+            if len(prices) >= MIN_BARS_FOR_SCORE:
+                analysis = analyze_stock(prices, earn_bar_date, timing)
+                snap["score"] = analysis["composite"]["composite_score"]
+                snap["grade"] = analysis["composite"]["grade"]
     return snap
 
 

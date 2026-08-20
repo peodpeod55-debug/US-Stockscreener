@@ -19,6 +19,19 @@ def _pct_vs(price, level):
     return round((price - level) / level * 100, 2)
 
 
+def detect_new_breaks(daily_prices, levels):
+    """level ที่ "เพิ่งทะลุ": ปิดล่าสุดเหนือแนว แต่ปิดวันก่อนหน้ายังไม่เหนือ
+
+    คืน list จาก ("high_5d", "high_3m") — นิยามนี้กันเตือนซ้ำทุกวันที่ยืนเหนือแนว
+    """
+    if not levels or not daily_prices or len(daily_prices) < 2:
+        return []
+    close = daily_prices[0]["close"]
+    prev = daily_prices[1]["close"]
+    return [k for k in ("high_5d", "high_3m")
+            if levels.get(k) is not None and prev <= levels[k] < close]
+
+
 def compute_levels(daily_prices, earnings_date, timing):
     """คืน dict ระดับราคา หรือ None ถ้าหา reaction day (D0) ไม่ได้
 
