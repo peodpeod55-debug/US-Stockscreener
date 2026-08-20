@@ -92,6 +92,8 @@ class FMPClient:
         # FMP free tier restricts some symbols (HTTP 402) — callers can
         # reset + inspect this flag to distinguish "not covered" from "not found"
         self.saw_402 = False
+        # HTTP status of the most recent request (None if no response)
+        self.last_status = None
         # Circuit breaker: track consecutive failures per endpoint URL prefix
         self._endpoint_failures: dict[str, int] = {}
         self._disabled_endpoints: set[str] = set()
@@ -100,6 +102,7 @@ class FMPClient:
         self, url: str, params: Optional[dict] = None, quiet: bool = False
     ) -> Optional[dict]:
         """Execute a rate-limited GET request with budget enforcement."""
+        self.last_status = None
         if self.rate_limit_reached:
             return None
 
@@ -119,6 +122,7 @@ class FMPClient:
             response = self.session.get(url, params=params, timeout=30)
             self.last_call_time = time.time()
             self.api_calls_made += 1
+            self.last_status = response.status_code
 
             if response.status_code == 200:
                 self.retry_count = 0
@@ -168,6 +172,11 @@ class FMPClient:
             is_last = i == len(endpoints) - 1
             data = self._rate_limited_get(url, final_params, quiet=not is_last)
             if not data:  # falsy (None, [], {}) -- try next endpoint
+                if self.last_status == 402:
+                    # 402 = symbol not in plan, not a broken endpoint: don't
+                    # count toward the circuit breaker, and the fallback
+                    # endpoints can't serve a plan-blocked symbol either
+                    return None
                 self._record_endpoint_failure(base_url)
                 continue
 
