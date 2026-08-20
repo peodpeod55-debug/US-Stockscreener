@@ -1,5 +1,6 @@
 ﻿.env
 reports/
+watchlist.json
 __pycache__/
 *.pyc
 bot.log

@@ -121,6 +121,25 @@ def format_lookup(s):
     return "\n".join(lines)
 
 
+_TIMING_TH = {"bmo": "ก่อนเปิดตลาด US", "amc": "หลังปิดตลาด US"}
+_DAYS_TH = {0: "วันนี้", 1: "พรุ่งนี้"}
+
+
+def format_reminders(items):
+    """ข้อความเตือนวันงบจาก build_reminders — None ถ้าไม่มีอะไรต้องเตือน"""
+    if not items:
+        return None
+    lines = ["📅 เตือนวันงบ (watchlist)"]
+    for it in items:
+        when = _DAYS_TH.get(it["days_to"], f"อีก {it['days_to']} วัน")
+        line = f"• {it['symbol']} — งบ{when} ({it['date']})"
+        label = _TIMING_TH.get(it["timing"])
+        if label:
+            line += f" {label}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
 def format_scan(scan):
     """คืน list ข้อความ (แต่ละฉบับ ≤ MAX_LEN ตัวอักษร) สำหรับส่ง Telegram"""
     skipped = scan["skipped_counts"]

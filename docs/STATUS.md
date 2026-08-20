@@ -22,6 +22,7 @@ Telegram bot (`@Sakuro_usbot`) คัดกรองหุ้น US "อาก�
 | รันถาวร | Startup shortcut → `start_bot_hidden.vbs` → `run_bot.bat` (restart loop 60s) — bot รัน detached อยู่ |
 | GitHub | https://github.com/peodpeod55-debug/US-Stockscreener branch `feature/telegram-earnings-bot` push ครบ |
 | Lookup รายตัว (20 ส.ค. เย็น) | พิมพ์ ticker หาบอท (สูงสุด 5 ตัว/ข้อความ) → snapshot ราคา EOD, %เปลี่ยน, วอลุ่ม, วันงบล่าสุด/ถัดไป, สัญญาณหลังงบ+เกรด, H/L 5วัน/3ด./52w, DR — `bot/lookup.py` + `format_lookup` + `get_earnings_dates` (2 API calls/ตัว) |
+| Watchlist + เตือนวันงบ (20 ส.ค. ค่ำ) | พิมพ์ `ติดตาม NVDA` / `เลิกติดตาม NVDA` / `ติดตาม` (ดูรายชื่อ, สูงสุด 20 ตัว, เก็บใน `watchlist.json` — gitignored) · job ทุกวัน 08:25 เช็คหุ้นที่ติดตามตัวไหนงบวันนี้/พรุ่งนี้แล้วเตือนพร้อม BMO/AMC (1 API call/ตัว/วัน) — `bot/watchlist.py` + `bot/reminders.py` + `format_reminders` |
 
 ## 🔧 บั๊กที่เจอและแก้แล้วระหว่างทาง
 

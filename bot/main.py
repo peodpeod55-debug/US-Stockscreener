@@ -8,9 +8,17 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 from bot.config import PROJECT_ROOT, load_config
-from bot.formatter import format_lookup, format_scan
+from bot.formatter import format_lookup, format_reminders, format_scan
 from bot.lookup import LOOKUP_MAX, SymbolNotCovered, lookup_symbol, parse_tickers
+from bot.reminders import build_reminders
 from bot.screener import load_universe, run_scan, save_reports
+from bot.watchlist import (
+    WATCHLIST_MAX,
+    add_symbols,
+    load_watchlist,
+    parse_watch_command,
+    remove_symbols,
+)
 from fmp_client import FMPClient  # sys.path ถูกตั้งโดย bot.screener/bot.lookup แล้ว
 
 TZ = ZoneInfo("Asia/Bangkok")
@@ -68,13 +76,61 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"หลายตัวพร้อมกัน (สูงสุด {LOOKUP_MAX}): NVDA TSLA AAPL\n"
         "ได้ราคาปิดล่าสุด, %เปลี่ยน, วอลุ่ม, วันงบ,\n"
         "สัญญาณหลังงบ + เกรด, High/Low 5วัน/3ด./52w\n\n"
-        "Push อัตโนมัติ: อังคาร–เสาร์ 08:30 น."
+        f"Watchlist (สูงสุด {WATCHLIST_MAX} ตัว):\n"
+        "ติดตาม NVDA — เพิ่มหุ้นเข้า watchlist\n"
+        "เลิกติดตาม NVDA — เอาออก\n"
+        "ติดตาม — ดูรายชื่อที่ติดตามอยู่\n"
+        "บอทจะเตือนตอนเช้าเมื่อหุ้นที่ติดตาม\n"
+        "มีงบวันนี้/พรุ่งนี้ (บอก BMO/AMC)\n\n"
+        "Push อัตโนมัติ: อังคาร–เสาร์ 08:30 น.\n"
+        "เตือนวันงบ: ทุกวัน 08:25 น."
     )
 
 
+async def _handle_watch_command(update, action, tickers):
+    if action == "show":
+        symbols = load_watchlist()
+        if not symbols:
+            await update.message.reply_text(
+                "ยังไม่มีหุ้นใน watchlist — พิมพ์ เช่น: ติดตาม NVDA")
+            return
+        await update.message.reply_text(
+            f"👀 ติดตามอยู่ {len(symbols)} ตัว: {', '.join(symbols)}\n"
+            "เตือนวันงบทุกเช้า 08:25 · เอาออก: เลิกติดตาม <ticker>")
+        return
+    if action == "remove":
+        if not tickers:
+            await update.message.reply_text("ใช้: เลิกติดตาม <ticker> เช่น เลิกติดตาม NVDA")
+            return
+        r = remove_symbols(tickers)
+        parts = []
+        if r["removed"]:
+            parts.append(f"🗑 เอาออกแล้ว: {', '.join(r['removed'])}")
+        if r["missing"]:
+            parts.append(f"ไม่ได้ติดตามอยู่แล้ว: {', '.join(r['missing'])}")
+        await update.message.reply_text("\n".join(parts))
+        return
+    # action == "add"
+    r = add_symbols(tickers)
+    parts = []
+    if r["added"]:
+        parts.append(f"✅ ติดตามแล้ว: {', '.join(r['added'])}\n"
+                     "บอทจะเตือนตอนเช้าเมื่อใกล้วันงบ (วันนี้/พรุ่งนี้)")
+    if r["already"]:
+        parts.append(f"ติดตามอยู่แล้ว: {', '.join(r['already'])}")
+    if r["full"]:
+        parts.append(f"⚠️ watchlist เต็ม ({WATCHLIST_MAX} ตัว) — "
+                     f"ไม่ได้เพิ่ม: {', '.join(r['full'])}")
+    await update.message.reply_text("\n".join(parts))
+
+
 async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """พิมพ์ ticker (ไม่ใช่คำสั่ง /) → snapshot ราคารายตัว"""
+    """พิมพ์ ticker (ไม่ใช่คำสั่ง /) → snapshot ราคารายตัว · "ติดตาม ..." → watchlist"""
     if not _authorized(update):
+        return
+    watch = parse_watch_command(update.message.text)
+    if watch:
+        await _handle_watch_command(update, *watch)
         return
     tickers = parse_tickers(update.message.text)
     if not tickers:
@@ -106,6 +162,23 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(format_lookup(snap))
 
 
+async def reminder_job(context: ContextTypes.DEFAULT_TYPE):
+    """เช้าทุกวัน: เช็คหุ้นใน watchlist ตัวไหนงบวันนี้/พรุ่งนี้แล้วแจ้งเตือน"""
+    symbols = load_watchlist()
+    if not symbols:
+        return
+    try:
+        client = FMPClient(api_key=CONFIG.fmp_api_key,
+                           max_api_calls=len(symbols) + 2)
+        items = await asyncio.to_thread(
+            build_reminders, symbols, client.get_earnings_dates)
+        msg = format_reminders(items)
+        if msg:
+            await context.bot.send_message(chat_id=CONFIG.chat_id, text=msg)
+    except Exception:
+        logger.exception("reminder job failed")
+
+
 async def daily_job(context: ContextTypes.DEFAULT_TYPE):
     # job ตั้งรันทุกวัน แล้วเช็ควันในนี้เอง (กันความกำกวมเรื่อง days ของ JobQueue)
     if datetime.now(TZ).weekday() not in PUSH_WEEKDAYS:
@@ -127,6 +200,8 @@ def main():
     app.add_handler(CommandHandler("scan", cmd_scan))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
     app.job_queue.run_daily(daily_job, time=time(8, 30, tzinfo=TZ))
+    # เตือนวันงบรันทุกวัน (ไม่เว้นอาทิตย์/จันทร์ — งบวันจันทร์ต้องเตือนตั้งแต่อาทิตย์)
+    app.job_queue.run_daily(reminder_job, time=time(8, 25, tzinfo=TZ))
     logger.info("bot starting")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
