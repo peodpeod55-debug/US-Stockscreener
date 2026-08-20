@@ -13,6 +13,7 @@ if str(ETA_DIR) not in sys.path:
 from analyze_earnings_trades import analyze_stock, normalize_timing  # noqa: E402
 from fmp_client import ApiCallBudgetExceeded, FMPClient  # noqa: E402
 
+from bot import fetch_cache  # noqa: E402
 from bot.levels import compute_levels  # noqa: E402
 
 UNIVERSE_CSV = PROJECT_ROOT / "us_stock_list.csv"
@@ -72,22 +73,25 @@ def run_scan(config, lookback_days=None, client=None, secondary_cal_fn=None,
     candidates, skipped, pending = [], {"C": 0, "D": 0}, []
     for item in reported:
         sym = item["symbol"]
-        client.saw_402 = False  # ธงต่อ symbol — ดู lookup.lookup_symbol
-        try:
-            prices = client.get_historical_prices(sym, days=250)
-        except ApiCallBudgetExceeded:
-            break
-        if not prices or len(prices) < 70:
+        prices = fetch_cache.get(("prices", sym, 250))
+        blocked = False
+        if prices is None:
+            client.saw_402 = False  # ธงต่อ symbol — ดู lookup.lookup_symbol
+            try:
+                prices = client.get_historical_prices(sym, days=250)
+            except ApiCallBudgetExceeded:
+                break
             blocked = getattr(client, "saw_402", False)
-            if blocked and fallback_prices_fn:
+            if (not prices or len(prices) < 70) and blocked and fallback_prices_fn:
                 try:
                     prices = fallback_prices_fn(sym, 250) or []
                 except Exception:
                     prices = []
-            if not prices or len(prices) < 70:
-                pending.append({**item,
-                                "reason": "not_in_plan" if blocked else "no_data"})
-                continue
+            fetch_cache.put(("prices", sym, 250), prices)
+        if not prices or len(prices) < 70:
+            pending.append({**item,
+                            "reason": "not_in_plan" if blocked else "no_data"})
+            continue
         analysis = analyze_stock(prices, item["date"], item["timing"])
         levels = compute_levels(prices, item["date"], item["timing"])
         if levels is None:

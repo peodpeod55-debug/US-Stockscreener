@@ -14,6 +14,7 @@ if str(ETA_DIR) not in sys.path:
 
 from analyze_earnings_trades import analyze_stock, normalize_timing  # noqa: E402
 
+from bot import fetch_cache  # noqa: E402
 from bot.levels import compute_levels, detect_new_breaks, detect_sl_break  # noqa: E402
 
 LOOKUP_MAX = 5                  # เพดานจำนวนหุ้นต่อหนึ่งข้อความ (คุมงบ API)
@@ -171,19 +172,24 @@ def lookup_symbol(client, symbol, universe, today=None, fallback_prices_fn=None)
 
     fallback_prices_fn(symbol, days) → แท่งราคาแหล่งสำรอง ใช้เมื่อ FMP ตอบ 402
     raise SymbolNotCovered ถ้าแผน FMP ไม่ครอบคลุมและแหล่งสำรองก็ไม่มีข้อมูล
+    ราคา/วันงบผ่าน fetch_cache — job เช้าหลายตัวดึงหุ้นชุดเดียวกันไม่เปลืองงบซ้ำ
     """
-    client.saw_402 = False  # ธงต่อ symbol — client ตัวเดียวใช้หลายตัวต่อข้อความ
-    prices = client.get_historical_prices(symbol, days=250)
-    if not prices or len(prices) < 2:
-        if not getattr(client, "saw_402", False):
-            return None
-        if fallback_prices_fn:
-            try:
-                prices = fallback_prices_fn(symbol, 250)
-            except Exception:
-                prices = None
+    prices = fetch_cache.get(("prices", symbol, 250))
+    if prices is None:
+        client.saw_402 = False  # ธงต่อ symbol — client ตัวเดียวใช้หลายตัวต่อข้อความ
+        prices = client.get_historical_prices(symbol, days=250)
         if not prices or len(prices) < 2:
-            raise SymbolNotCovered(symbol)
-    earnings = client.get_earnings_dates(symbol)
+            if not getattr(client, "saw_402", False):
+                return None
+            if fallback_prices_fn:
+                try:
+                    prices = fallback_prices_fn(symbol, 250)
+                except Exception:
+                    prices = None
+            if not prices or len(prices) < 2:
+                raise SymbolNotCovered(symbol)
+        fetch_cache.put(("prices", symbol, 250), prices)
+    earnings = fetch_cache.cached(
+        ("earnings", symbol), lambda: client.get_earnings_dates(symbol))
     return build_snapshot(symbol, prices, meta=universe.get(symbol),
                           earnings=earnings, today=today)

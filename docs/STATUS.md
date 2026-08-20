@@ -29,6 +29,8 @@ Telegram bot (`@Sakuro_usbot`) คัดกรองหุ้น US "อาก�
 | เตือนหลุด SL (20 ส.ค. รอบสอง) | ใน `breakout_job` เดิม (ศูนย์ API เพิ่ม): หุ้นที่ติดตามตัวไหน low ล่าสุดหลุด SL (low วันงบ) แต่วันก่อนยังไม่หลุด (self-dedup แบบเดียวกับทะลุแนว) → แจ้ง 🛑 พร้อมราคาปิด/low/ระดับ SL — `detect_sl_break` ใน levels.py + field `sl_break`,`low` ใน snapshot + `format_sl_breaks` |
 | Catch-up job ที่พลาด (20 ส.ค. รอบสอง) | เครื่องปิด/หลับช่วงเช้า → เปิดเครื่องแล้วบอทรันรอบที่พลาดชดเชยเอง: `bot/jobstate.py` — state file `job_state.json` (gitignored) แต่ละ job `claim` วันของตัวเองก่อนทำงาน (restart กี่รอบก็ไม่ส่งซ้ำ) + `due_catchup(now)` เลือก job ที่เวลาผ่านแล้ววันนี้ + `catchup_job` ยิง `run_once` 15 วิหลัง start (openbell ไม่ catch-up — ผูกช่วงเปิดตลาด) · `/scan` และ `สรุป` manual ไม่ claim |
 | GitHub Actions CI (20 ส.ค. รอบสอง) | `.github/workflows/ci.yml` — รัน `pytest -q` บน Python 3.12 ทุก push/PR เข้า master |
+| Price cache ข้าม job (20 ส.ค. รอบสาม) | `bot/fetch_cache.py` — in-memory TTL 60 นาที คีย์ `("prices", sym, 250)` / `("earnings", sym)` ใช้ร่วมกันใน lookup/breakout/scan/reminder/weekly → job เช้า 08:20/08:25/08:30 (และ catch-up) ดึงหุ้นชุดที่ทับซ้อนกันแค่รอบเดียว ตัดงบ API เกินครึ่ง · ค่าว่างไม่ cache (fetch ล้มลองใหม่ได้), list คืนสำเนากัน mutate, `tests/conftest.py` ล้าง cache ทุก test |
+| signals.json (20 ส.ค. รอบสาม) | `bot/signals.py` — บันทึกถาวรของสัญญาณ A/B ที่แจ้ง (dedup `(symbol, earnings_date)` ครั้งแรกที่แจ้งชนะ) เขียนจากทุกสแกน (manual + อัตโนมัติ) **track ใน git เป็น backup** (ไม่ gitignore) · weekly อ่านจาก `signals_since(30)` แทนการ glob `reports/scan_*.json` (ลบ `collect_signals` แล้ว — reports/ เหลือเป็น artifact อย่างเดียว) · เป็นฐานของฟีเจอร์สถิติผลงานระยะยาวต่อไป |
 
 ## 🔧 บั๊กที่เจอและแก้แล้วระหว่างทาง
 
@@ -52,6 +54,7 @@ Telegram bot (`@Sakuro_usbot`) คัดกรองหุ้น US "อาก�
    (seed `job_state.json` เป็น 20 ส.ค. ไว้แล้ว — catch-up จะไม่ยิงย้อนของวันที่ 20 ที่ user เห็นจาก manual scan แล้ว)
 3. (เสนอ) **patch fmp_client ต้นฉบับ** ใน earnings-trade-analyzer + pead-screener skills ให้ใช้ endpoint ใหม่ (ตามข้อ 1 ด้านบน)
 4. (ไอเดีย) ต่อยอด: ติดตาม drift รายสัปดาห์ด้วย logic pead-screener หลังหุ้นติดเกรด A/B
+5. (แผนรอบถัดไป) กราฟแท่งเทียนแนบข้อความแจ้ง (mplfinance, ไม่ใช้ API เพิ่ม) หรือ DR premium/discount เทียบหุ้นแม่ · สถิติผลงานสะสมจาก signals.json (win rate แยกเกรด, drift 5/20/60 วัน)
 
 ## วิธีใช้งาน / ดูแล
 

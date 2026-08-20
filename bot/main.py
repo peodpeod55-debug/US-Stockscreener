@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
+from bot import fetch_cache
 from bot.config import PROJECT_ROOT, load_config
 from bot.formatter import (
     format_breakouts,
@@ -22,7 +23,8 @@ from bot.openbell import build_open_report, fetch_yahoo_quote, in_open_window
 from bot.lookup import LOOKUP_MAX, SymbolNotCovered, lookup_symbol, parse_tickers
 from bot.nasdaq_cal import fetch_nasdaq_earnings
 from bot.reminders import build_reminders
-from bot.screener import REPORTS_DIR, load_universe, run_scan, save_reports
+from bot.screener import load_universe, run_scan, save_reports
+from bot.signals import record_signals, signals_since
 from bot.weekly import SIGNAL_LOOKBACK_DAYS, build_weekly_items
 from bot.yahoo_prices import fetch_yahoo_prices
 from bot.watchlist import (
@@ -61,6 +63,8 @@ async def _do_scan_and_send(bot, chat_id, lookback):
                                    fallback_prices_fn=fetch_yahoo_prices)
     messages = format_scan(scan)
     save_reports(scan, messages)
+    # บันทึกสัญญาณ A/B ลง signals.json (dedup ต่อรอบงบ) — ฐานของสรุปรายสัปดาห์
+    record_signals(scan["candidates"], scan["to_date"])
     for msg in messages:
         await bot.send_message(chat_id=chat_id, text=msg)
     # หุ้นเกรด A/B เข้า watchlist อัตโนมัติ → ได้เตือนทะลุแนว/วันงบต่อเอง
@@ -226,8 +230,13 @@ async def reminder_job(context: ContextTypes.DEFAULT_TYPE):
     try:
         client = FMPClient(api_key=CONFIG.fmp_api_key,
                            max_api_calls=len(symbols) + 2)
-        items = await asyncio.to_thread(
-            build_reminders, symbols, client.get_earnings_dates)
+
+        def get_earnings(sym):
+            # breakout_job 08:20 เพิ่ง cache วันงบหุ้นชุดเดียวกัน — ไม่ดึงซ้ำ
+            return fetch_cache.cached(
+                ("earnings", sym), lambda: client.get_earnings_dates(sym))
+
+        items = await asyncio.to_thread(build_reminders, symbols, get_earnings)
         msg = format_reminders(items)
         if msg:
             await context.bot.send_message(chat_id=CONFIG.chat_id, text=msg)
@@ -298,22 +307,25 @@ async def openbell_job(context: ContextTypes.DEFAULT_TYPE):
 
 
 def _weekly_get_prices(client, sym):
-    """ราคาสำหรับสรุปรายสัปดาห์ — FMP ก่อน, 402 → yahoo (แบบเดียวกับ lookup)"""
-    client.saw_402 = False
-    prices = client.get_historical_prices(sym, days=250)
-    if not prices and getattr(client, "saw_402", False):
-        try:
-            prices = fetch_yahoo_prices(sym, 250)
-        except Exception:
-            prices = None
-    return prices
+    """ราคาสำหรับสรุปรายสัปดาห์ — cache ก่อน, FMP, 402 → yahoo (แบบเดียวกับ lookup)"""
+    def fetch():
+        client.saw_402 = False
+        prices = client.get_historical_prices(sym, days=250)
+        if not prices and getattr(client, "saw_402", False):
+            try:
+                prices = fetch_yahoo_prices(sym, 250)
+            except Exception:
+                prices = None
+        return prices
+
+    return fetch_cache.cached(("prices", sym, 250), fetch)
 
 
 async def _send_weekly(bot, chat_id, notify_empty=False):
-    """สรุปผลหุ้นที่บอทแจ้ง 30 วันล่าสุด (PEAD drift)"""
+    """สรุปผลหุ้นที่บอทแจ้ง 30 วันล่าสุด (PEAD drift) — สัญญาณจาก signals.json"""
     client = FMPClient(api_key=CONFIG.fmp_api_key, max_api_calls=60)
     items = await asyncio.to_thread(
-        build_weekly_items, REPORTS_DIR,
+        build_weekly_items, signals_since(SIGNAL_LOOKBACK_DAYS),
         lambda sym: _weekly_get_prices(client, sym))
     msg = format_weekly(items)
     if msg:

@@ -1,59 +1,9 @@
-import json
 from datetime import date
 
 from bot.formatter import format_weekly
-from bot.weekly import build_weekly_items, collect_signals, evaluate_signal
+from bot.weekly import build_weekly_items, evaluate_signal
 
 TODAY = date(2026, 8, 20)
-
-
-def _write_report(dirpath, stamp, to_date, candidates):
-    data = {"to_date": to_date, "candidates": candidates}
-    (dirpath / f"scan_{stamp}.json").write_text(
-        json.dumps(data), encoding="utf-8")
-
-
-def _cand(symbol, price, sl=95.0, earnings_date="2026-08-01", **over):
-    c = {"symbol": symbol, "name": f"{symbol} Corp", "grade": "A",
-         "score": 88.0, "earnings_date": earnings_date, "dr_symbols": "",
-         "levels": {"price": price, "sl": sl}}
-    c.update(over)
-    return c
-
-
-# ── collect_signals ──────────────────────────────────────────────
-
-def test_collect_dedup_keeps_earliest_flag(tmp_path):
-    # หุ้นเดิมโผล่สองสแกน (lookback ทับกัน) → นับครั้งแรกที่แจ้ง
-    _write_report(tmp_path, "2026-08-05_083000", "2026-08-05", [_cand("NVDA", 100.0)])
-    _write_report(tmp_path, "2026-08-06_083000", "2026-08-06", [_cand("NVDA", 104.0)])
-    sigs = collect_signals(tmp_path, today=TODAY)
-    assert len(sigs) == 1
-    assert sigs[0]["flag_date"] == "2026-08-05"
-    assert sigs[0]["flag_price"] == 100.0
-    assert sigs[0]["sl"] == 95.0
-    assert sigs[0]["grade"] == "A"
-
-
-def test_collect_same_symbol_new_earnings_round_is_new_signal(tmp_path):
-    _write_report(tmp_path, "2026-08-01_083000", "2026-08-01",
-                  [_cand("NVDA", 100.0, earnings_date="2026-07-30")])
-    _write_report(tmp_path, "2026-08-15_083000", "2026-08-15",
-                  [_cand("NVDA", 120.0, earnings_date="2026-08-14")])
-    assert len(collect_signals(tmp_path, today=TODAY)) == 2
-
-
-def test_collect_skips_scans_older_than_window(tmp_path):
-    _write_report(tmp_path, "2026-07-01_083000", "2026-07-01", [_cand("OLD", 50.0)])
-    _write_report(tmp_path, "2026-08-10_083000", "2026-08-10", [_cand("NEW", 60.0)])
-    sigs = collect_signals(tmp_path, today=TODAY)
-    assert [s["symbol"] for s in sigs] == ["NEW"]
-
-
-def test_collect_tolerates_bad_file_and_empty_dir(tmp_path):
-    (tmp_path / "scan_2026-08-10_083000.json").write_text("พัง", encoding="utf-8")
-    assert collect_signals(tmp_path, today=TODAY) == []
-    assert collect_signals(tmp_path / "ไม่มีจริง", today=TODAY) == []
 
 
 # ── evaluate_signal ──────────────────────────────────────────────
@@ -98,8 +48,9 @@ def test_evaluate_no_prices_returns_none():
 
 # ── build_weekly_items ───────────────────────────────────────────
 
-def test_build_weekly_items_end_to_end(tmp_path):
-    _write_report(tmp_path, "2026-08-05_083000", "2026-08-05", [_cand("NVDA", 100.0)])
+def test_build_weekly_items_end_to_end():
+    # รับ list สัญญาณตรงๆ (จาก signals_since) — ตัวที่ดึงราคาพัง/ไม่มีข้อมูล ข้าม
+    signals = [_sig(), _sig(symbol="BAD"), _sig(symbol="NODATA")]
     prices = {"NVDA": [_bar("2026-08-19", 110.0), _bar("2026-08-05", 100.0)]}
 
     def get_prices(sym):
@@ -107,7 +58,7 @@ def test_build_weekly_items_end_to_end(tmp_path):
             raise RuntimeError("boom")
         return prices.get(sym)
 
-    items = build_weekly_items(tmp_path, get_prices, today=TODAY)
+    items = build_weekly_items(signals, get_prices)
     assert len(items) == 1
     assert items[0]["symbol"] == "NVDA"
     assert round(items[0]["pct"], 2) == 10.0
