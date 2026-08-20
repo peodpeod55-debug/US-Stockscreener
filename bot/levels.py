@@ -32,6 +32,19 @@ def detect_new_breaks(daily_prices, levels):
             if levels.get(k) is not None and prev <= levels[k] < close]
 
 
+def detect_sl_break(daily_prices, levels):
+    """SL ที่ "เพิ่งหลุด": low ล่าสุดต่ำกว่า SL แต่ low วันก่อนหน้ายังไม่หลุด
+
+    นิยาม low < sl เดียวกับ sl_hit ใน weekly — self-dedup ไม่เตือนซ้ำทุกวันที่อยู่ใต้แนว
+    """
+    if not levels or not daily_prices or len(daily_prices) < 2:
+        return False
+    sl = levels.get("sl")
+    if sl is None:
+        return False
+    return daily_prices[0]["low"] < sl <= daily_prices[1]["low"]
+
+
 def compute_levels(daily_prices, earnings_date, timing):
     """คืน dict ระดับราคา หรือ None ถ้าหา reaction day (D0) ไม่ได้
 

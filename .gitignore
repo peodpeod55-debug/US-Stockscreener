@@ -2,6 +2,7 @@
 reports/
 watchlist.json
 auto_watch.json
+job_state.json
 __pycache__/
 *.pyc
 bot.log

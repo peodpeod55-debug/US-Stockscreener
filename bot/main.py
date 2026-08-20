@@ -14,8 +14,10 @@ from bot.formatter import (
     format_open_report,
     format_reminders,
     format_scan,
+    format_sl_breaks,
     format_weekly,
 )
+from bot.jobstate import PUSH_WEEKDAYS, already_ran, claim, due_catchup
 from bot.openbell import build_open_report, fetch_yahoo_quote, in_open_window
 from bot.lookup import LOOKUP_MAX, SymbolNotCovered, lookup_symbol, parse_tickers
 from bot.nasdaq_cal import fetch_nasdaq_earnings
@@ -38,7 +40,6 @@ from bot.watchlist import (
 from fmp_client import FMPClient  # sys.path ถูกตั้งโดย bot.screener/bot.lookup แล้ว
 
 TZ = ZoneInfo("Asia/Bangkok")
-PUSH_WEEKDAYS = {1, 2, 3, 4, 5}  # date.weekday(): จ=0 → อังคาร(1)–เสาร์(5)
 
 logging.basicConfig(
     filename=PROJECT_ROOT / "bot.log", level=logging.INFO,
@@ -113,7 +114,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "(+/-% ตั้งแต่วันแจ้ง, เคยหลุด SL ไหม)\n\n"
         "Push อัตโนมัติ: อังคาร–เสาร์ 08:30 น.\n"
         "เตือนวันงบ: ทุกวัน 08:25 น.\n"
-        "เตือนทะลุแนว (High 5วัน/3ด.ก่อนงบ): อังคาร–เสาร์ 08:20 น.\n"
+        "เตือนทะลุแนว (High 5วัน/3ด.ก่อนงบ)\n"
+        "และเตือนหลุด SL: อังคาร–เสาร์ 08:20 น.\n"
         "สรุปผลรายสัปดาห์: อาทิตย์ 09:00 น.\n"
         "ยืนยันเปิดตลาด US (หุ้นที่ติดตาม): ~30 นาทีหลังเปิด"
     )
@@ -216,6 +218,8 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def reminder_job(context: ContextTypes.DEFAULT_TYPE):
     """เช้าทุกวัน: เช็คหุ้นที่ติดตาม (manual + auto) ตัวไหนงบวันนี้/พรุ่งนี้"""
+    if not claim("reminder"):
+        return
     symbols = all_watched()
     if not symbols:
         return
@@ -232,8 +236,10 @@ async def reminder_job(context: ContextTypes.DEFAULT_TYPE):
 
 
 async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
-    """เช้าอังคาร–เสาร์ (หลังได้ EOD คืนก่อน): หุ้นที่ติดตามตัวไหนเพิ่งทะลุแนว"""
+    """เช้าอังคาร–เสาร์ (หลังได้ EOD คืนก่อน): หุ้นที่ติดตามตัวไหนเพิ่งทะลุแนว/หลุด SL"""
     if datetime.now(TZ).weekday() not in PUSH_WEEKDAYS:
+        return
+    if not claim("breakout"):
         return
     symbols = all_watched()
     if not symbols:
@@ -242,7 +248,7 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
         client = FMPClient(api_key=CONFIG.fmp_api_key,
                            max_api_calls=3 * len(symbols) + 2)
         universe = load_universe()
-        alerts = []
+        alerts, sl_alerts = [], []
         for sym in symbols:
             try:
                 snap = await asyncio.to_thread(
@@ -253,9 +259,11 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
                 continue
             if snap and snap.get("new_breaks"):
                 alerts.append(snap)
-        msg = format_breakouts(alerts)
-        if msg:
-            await context.bot.send_message(chat_id=CONFIG.chat_id, text=msg)
+            if snap and snap.get("sl_break"):
+                sl_alerts.append(snap)
+        for msg in (format_breakouts(alerts), format_sl_breaks(sl_alerts)):
+            if msg:
+                await context.bot.send_message(chat_id=CONFIG.chat_id, text=msg)
     except Exception:
         logger.exception("breakout job failed")
 
@@ -320,6 +328,8 @@ async def weekly_job(context: ContextTypes.DEFAULT_TYPE):
     """อาทิตย์เช้า: สรุปว่าหุ้นที่บอทเคยแจ้ง ตอนนี้เป็นยังไงบ้าง"""
     if datetime.now(TZ).weekday() != 6:  # อาทิตย์
         return
+    if not claim("weekly"):
+        return
     try:
         await _send_weekly(context.bot, CONFIG.chat_id)
     except Exception:
@@ -330,6 +340,8 @@ async def daily_job(context: ContextTypes.DEFAULT_TYPE):
     # job ตั้งรันทุกวัน แล้วเช็ควันในนี้เอง (กันความกำกวมเรื่อง days ของ JobQueue)
     if datetime.now(TZ).weekday() not in PUSH_WEEKDAYS:
         return
+    if not claim("scan"):
+        return
     try:
         await _do_scan_and_send(context.bot, CONFIG.chat_id, CONFIG.lookback_days)
     except Exception as e:
@@ -339,6 +351,21 @@ async def daily_job(context: ContextTypes.DEFAULT_TYPE):
                 chat_id=CONFIG.chat_id, text=f"⚠️ Daily scan ล้มเหลว: {e}")
         except Exception:
             logger.exception("error notify failed")
+
+
+async def catchup_job(context: ContextTypes.DEFAULT_TYPE):
+    """หลังบอท start: รัน job เช้าที่เวลาผ่านแล้วแต่วันนี้ยังไม่ได้รัน
+
+    เครื่องปิด/หลับช่วง 08:20–09:00 → เปิดเครื่องปุ๊บได้ผลชดเชยทันที
+    claim ในแต่ละ job กันส่งซ้ำกรณี restart ระหว่างวัน
+    """
+    jobs = {"breakout": breakout_job, "reminder": reminder_job,
+            "scan": daily_job, "weekly": weekly_job}
+    for name in due_catchup(datetime.now(TZ)):
+        if already_ran(name):
+            continue
+        logger.info("catch-up: running missed job %s", name)
+        await jobs[name](context)
 
 
 def main():
@@ -356,6 +383,8 @@ def main():
     # ยืนยันเปิดตลาด US: ยิงสองรอบ in_open_window เลือกรอบที่ห่างเปิด 20-80 นาที
     app.job_queue.run_daily(openbell_job, time=time(21, 0, tzinfo=TZ))
     app.job_queue.run_daily(openbell_job, time=time(22, 0, tzinfo=TZ))
+    # เปิดเครื่อง/restart หลังเวลา job เช้า → รันชดเชยรอบที่พลาด (กันซ้ำด้วย claim)
+    app.job_queue.run_once(catchup_job, when=15)
     logger.info("bot starting")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 

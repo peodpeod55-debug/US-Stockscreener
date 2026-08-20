@@ -26,6 +26,9 @@ Telegram bot (`@Sakuro_usbot`) คัดกรองหุ้น US "อาก�
 | เตือนทะลุแนว + auto-watch (20 ส.ค. ดึก) | job 08:20 อังคาร–เสาร์: หุ้นที่ติดตาม (manual+auto) ตัวไหน "เพิ่งทะลุ" High 5วัน/3ด.ก่อนงบ (ปิดข้ามแนวแต่เมื่อวานยังไม่ข้าม — กันเตือนซ้ำ) → แจ้งพร้อมวอลุ่ม/DR — `detect_new_breaks` ใน levels.py + `new_breaks` ใน snapshot + `format_breakouts` · หุ้นเกรด A/B จากสแกนเข้า watchlist เองอัตโนมัติ 30 วัน (`auto_watch.json` — gitignored, เพดาน 20 ตัวเก่าสุดหลุด, `เลิกติดตาม` เอาออกได้) |
 | สรุปผลรายสัปดาห์ (20 ส.ค. ดึก) | job อาทิตย์ 09:00 + พิมพ์ `สรุป` ได้ทุกเมื่อ: หุ้น A/B ที่แจ้งใน 30 วัน (อ่านจาก `reports/scan_*.json`, dedup ต่อ symbol+รอบงบ นับครั้งแรกที่แจ้ง) → +/-% ตั้งแต่วันแจ้ง, จำนวนวัน, 🛑 ถ้า low เคยหลุด SL, สรุปเฉลี่ย+อัตราบวก — `bot/weekly.py` + `format_weekly` (1 API call/ตัว, yahoo fallback สำหรับหุ้น 402) |
 | ยืนยันเปิดตลาด US (20 ส.ค. ดึก) | job ยิง 21:00+22:00 ไทย แล้ว `in_open_window` เลือกรอบที่ห่างระฆังเปิด (09:30 America/New_York — DST อัตโนมัติ) 20–80 นาที: quote สดหุ้นที่ติดตาม → ราคา, %วันนี้, gap เปิด, เหนือ/ใต้ราคาเปิด — `bot/openbell.py` + `get_quote` (stable/quote) ใน vendored client + `format_open_report` (yahoo quote fallback สำหรับ 402) |
+| เตือนหลุด SL (20 ส.ค. รอบสอง) | ใน `breakout_job` เดิม (ศูนย์ API เพิ่ม): หุ้นที่ติดตามตัวไหน low ล่าสุดหลุด SL (low วันงบ) แต่วันก่อนยังไม่หลุด (self-dedup แบบเดียวกับทะลุแนว) → แจ้ง 🛑 พร้อมราคาปิด/low/ระดับ SL — `detect_sl_break` ใน levels.py + field `sl_break`,`low` ใน snapshot + `format_sl_breaks` |
+| Catch-up job ที่พลาด (20 ส.ค. รอบสอง) | เครื่องปิด/หลับช่วงเช้า → เปิดเครื่องแล้วบอทรันรอบที่พลาดชดเชยเอง: `bot/jobstate.py` — state file `job_state.json` (gitignored) แต่ละ job `claim` วันของตัวเองก่อนทำงาน (restart กี่รอบก็ไม่ส่งซ้ำ) + `due_catchup(now)` เลือก job ที่เวลาผ่านแล้ววันนี้ + `catchup_job` ยิง `run_once` 15 วิหลัง start (openbell ไม่ catch-up — ผูกช่วงเปิดตลาด) · `/scan` และ `สรุป` manual ไม่ claim |
+| GitHub Actions CI (20 ส.ค. รอบสอง) | `.github/workflows/ci.yml` — รัน `pytest -q` บน Python 3.12 ทุก push/PR เข้า master |
 
 ## 🔧 บั๊กที่เจอและแก้แล้วระหว่างทาง
 
@@ -45,7 +48,8 @@ Telegram bot (`@Sakuro_usbot`) คัดกรองหุ้น US "อาก�
 
 1. ~~เปิด PR~~ ✅ PR #1 merge แล้ว (20 ส.ค.) — **ต่อจากนี้ทำงานบน `master` ตรงๆ ไม่ใช้ feature branch**
    (branch `feature/telegram-earnings-bot` ลบในเครื่องแล้ว เหลือบน GitHub ลบได้จากหน้า PR)
-2. **เช็คผล push อัตโนมัติรอบแรก** — พฤหัส 21 ส.ค. 08:30 น. จะได้เกรดของ **WMT + TGT** ที่เพิ่งออกงบ
+2. **เช็คผล push อัตโนมัติรอบแรก** — ศุกร์ 21 ส.ค. 08:30 น. จะได้เกรดของ **WMT + TGT** ที่เพิ่งออกงบ
+   (seed `job_state.json` เป็น 20 ส.ค. ไว้แล้ว — catch-up จะไม่ยิงย้อนของวันที่ 20 ที่ user เห็นจาก manual scan แล้ว)
 3. (เสนอ) **patch fmp_client ต้นฉบับ** ใน earnings-trade-analyzer + pead-screener skills ให้ใช้ endpoint ใหม่ (ตามข้อ 1 ด้านบน)
 4. (ไอเดีย) ต่อยอด: ติดตาม drift รายสัปดาห์ด้วย logic pead-screener หลังหุ้นติดเกรด A/B
 

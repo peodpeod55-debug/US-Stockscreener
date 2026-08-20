@@ -145,6 +145,23 @@ def format_breakouts(snaps):
     return "\n".join(lines)
 
 
+def format_sl_breaks(snaps):
+    """ข้อความเตือนหลุด SL จาก snapshot ที่ sl_break เป็นจริง — None ถ้าไม่มี"""
+    if not snaps:
+        return None
+    lines = ["🛑 หลุด SL! (watchlist)"]
+    for s in snaps:
+        icon = GRADE_ICON.get(s.get("grade"), "⚪")
+        lines.append("")
+        lines.append(f"{icon} {s['symbol']} — {s['name']}")
+        lines.append(f"💰 ปิด {s['price']:,.2f} ({_signed(s['day_change_pct'])}) · "
+                     f"low {s['low']:,.2f}")
+        lines.append(f"🛑 ต่ำกว่า SL (low วันงบ): {s['levels']['sl']:,.2f}")
+        if s.get("dr_symbols"):
+            lines.append(f"🇹🇭 DR: {s['dr_symbols']}")
+    return "\n".join(lines)
+
+
 def format_open_report(items):
     """ยืนยันช่วงเปิดตลาด US สำหรับหุ้นที่ติดตาม — None ถ้าไม่มีข้อมูล"""
     if not items:
