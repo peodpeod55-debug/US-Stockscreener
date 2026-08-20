@@ -18,6 +18,7 @@ from bot.lookup import LOOKUP_MAX, SymbolNotCovered, lookup_symbol, parse_ticker
 from bot.nasdaq_cal import fetch_nasdaq_earnings
 from bot.reminders import build_reminders
 from bot.screener import load_universe, run_scan, save_reports
+from bot.yahoo_prices import fetch_yahoo_prices
 from bot.watchlist import (
     AUTO_WATCH_DAYS,
     WATCHLIST_MAX,
@@ -51,7 +52,8 @@ def _authorized(update: Update) -> bool:
 
 async def _do_scan_and_send(bot, chat_id, lookback):
     scan = await asyncio.to_thread(run_scan, CONFIG, lookback,
-                                   secondary_cal_fn=fetch_nasdaq_earnings)
+                                   secondary_cal_fn=fetch_nasdaq_earnings,
+                                   fallback_prices_fn=fetch_yahoo_prices)
     messages = format_scan(scan)
     save_reports(scan, messages)
     for msg in messages:
@@ -177,7 +179,8 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     universe = load_universe()
     for sym in tickers:
         try:
-            snap = await asyncio.to_thread(lookup_symbol, client, sym, universe)
+            snap = await asyncio.to_thread(lookup_symbol, client, sym, universe,
+                                           fallback_prices_fn=fetch_yahoo_prices)
         except SymbolNotCovered:
             await update.message.reply_text(
                 f"🔒 ดึง {sym} ไม่ได้ — ticker ไม่ถูกต้อง "

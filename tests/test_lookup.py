@@ -208,6 +208,36 @@ def test_lookup_symbol_plan_blocked_raises():
         lookup_symbol(BlockedClient(None), "HD", {}, today=TODAY)
 
 
+def test_lookup_symbol_fallback_rescues_402():
+    """โดน 402 แต่แหล่งสำรองมีราคา → ได้ snapshot ไม่ raise"""
+    class BlockedClient(FakeClient):
+        def get_historical_prices(self, symbol, days=250):
+            self.saw_402 = True
+            return None
+
+    calls = []
+
+    def fallback(symbol, days):
+        calls.append((symbol, days))
+        return make_prices(30)
+
+    s = lookup_symbol(BlockedClient(None), "HD", {}, today=TODAY,
+                      fallback_prices_fn=fallback)
+    assert calls == [("HD", 250)]
+    assert s is not None and s["symbol"] == "HD" and s["price"] > 0
+
+
+def test_lookup_symbol_raises_when_fallback_also_fails():
+    class BlockedClient(FakeClient):
+        def get_historical_prices(self, symbol, days=250):
+            self.saw_402 = True
+            return None
+
+    with pytest.raises(SymbolNotCovered):
+        lookup_symbol(BlockedClient(None), "HD", {}, today=TODAY,
+                      fallback_prices_fn=lambda symbol, days: None)
+
+
 def test_lookup_symbol_resets_saw_402_between_symbols():
     # client ตัวเดียวใช้หลาย symbol ในข้อความเดียว — ธง 402 ต้องไม่ค้างข้ามตัว
     bars = make_prices(30)

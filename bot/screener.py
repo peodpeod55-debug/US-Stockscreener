@@ -33,11 +33,13 @@ def load_universe(csv_path=UNIVERSE_CSV):
     return universe
 
 
-def run_scan(config, lookback_days=None, client=None, secondary_cal_fn=None):
+def run_scan(config, lookback_days=None, client=None, secondary_cal_fn=None,
+             fallback_prices_fn=None):
     """สแกนหุ้นออกงบใน universe ให้คะแนน 5-factor + levels
 
     secondary_cal_fn(from_date, to_date) → ปฏิทินแหล่งที่สอง (รูปเดียวกับ FMP)
     ไว้เติมหุ้นที่แผนฟรี FMP กรองออกจากปฏิทินเงียบ ๆ — แหล่งเสริมล้มได้โดยไม่พังสแกน
+    fallback_prices_fn(symbol, days) → แท่งราคาแหล่งสำรอง ใช้เฉพาะหุ้นที่ FMP ตอบ 402
 
     คืน dict: from_date, to_date, universe_size, reported_symbols,
     candidates (เกรด A/B เรียง score มาก→น้อย), skipped_counts, api_stats
@@ -76,10 +78,16 @@ def run_scan(config, lookback_days=None, client=None, secondary_cal_fn=None):
         except ApiCallBudgetExceeded:
             break
         if not prices or len(prices) < 70:
-            reason = ("not_in_plan" if getattr(client, "saw_402", False)
-                      else "no_data")
-            pending.append({**item, "reason": reason})
-            continue
+            blocked = getattr(client, "saw_402", False)
+            if blocked and fallback_prices_fn:
+                try:
+                    prices = fallback_prices_fn(sym, 250) or []
+                except Exception:
+                    prices = []
+            if not prices or len(prices) < 70:
+                pending.append({**item,
+                                "reason": "not_in_plan" if blocked else "no_data"})
+                continue
         analysis = analyze_stock(prices, item["date"], item["timing"])
         levels = compute_levels(prices, item["date"], item["timing"])
         if levels is None:

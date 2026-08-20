@@ -164,17 +164,24 @@ class SymbolNotCovered(Exception):
     ก็ได้ 402 เหมือนกัน จึงแยกสองเคสนี้จากกันไม่ได้"""
 
 
-def lookup_symbol(client, symbol, universe, today=None):
+def lookup_symbol(client, symbol, universe, today=None, fallback_prices_fn=None):
     """ดึงข้อมูลหุ้นหนึ่งตัวแล้วประกอบ snapshot (None = ไม่พบข้อมูล)
 
-    raise SymbolNotCovered ถ้าแผน FMP ไม่ครอบคลุม symbol นี้
+    fallback_prices_fn(symbol, days) → แท่งราคาแหล่งสำรอง ใช้เมื่อ FMP ตอบ 402
+    raise SymbolNotCovered ถ้าแผน FMP ไม่ครอบคลุมและแหล่งสำรองก็ไม่มีข้อมูล
     """
     client.saw_402 = False  # ธงต่อ symbol — client ตัวเดียวใช้หลายตัวต่อข้อความ
     prices = client.get_historical_prices(symbol, days=250)
     if not prices or len(prices) < 2:
-        if getattr(client, "saw_402", False):
+        if not getattr(client, "saw_402", False):
+            return None
+        if fallback_prices_fn:
+            try:
+                prices = fallback_prices_fn(symbol, 250)
+            except Exception:
+                prices = None
+        if not prices or len(prices) < 2:
             raise SymbolNotCovered(symbol)
-        return None
     earnings = client.get_earnings_dates(symbol)
     return build_snapshot(symbol, prices, meta=universe.get(symbol),
                           earnings=earnings, today=today)

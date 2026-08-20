@@ -96,6 +96,61 @@ def test_run_scan_separates_plan_blocked_from_no_data():
     assert reasons == {"WMT": "not_in_plan", "AAPL": "no_data"}
 
 
+def test_run_scan_fallback_prices_rescue_402_symbol():
+    """หุ้นโดน 402 แต่แหล่งสำรองมีราคา → ต้องถูกวิเคราะห์ปกติ ไม่ค้างใน pending"""
+    bars = _uptrend_prices()
+    calendar = [{"symbol": "WMT", "date": bars[2]["date"], "time": "amc"}]
+    calls = []
+
+    def fallback(symbol, days):
+        calls.append((symbol, days))
+        return bars
+
+    cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
+    scan = run_scan(cfg, lookback_days=3,
+                    client=Fake402Client(calendar, {}, blocked={"WMT"}),
+                    fallback_prices_fn=fallback)
+    assert calls == [("WMT", 250)]
+    assert scan["pending"] == []
+    total = (len(scan["candidates"]) + scan["skipped_counts"]["C"]
+             + scan["skipped_counts"]["D"])
+    assert total == 1
+
+
+def test_run_scan_fallback_failure_keeps_not_in_plan():
+    bars = _uptrend_prices()
+    calendar = [{"symbol": "WMT", "date": bars[2]["date"], "time": "amc"}]
+
+    def fallback(symbol, days):
+        raise ConnectionError("stooq down")
+
+    cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
+    scan = run_scan(cfg, lookback_days=3,
+                    client=Fake402Client(calendar, {}, blocked={"WMT"}),
+                    fallback_prices_fn=fallback)
+    assert [(p["symbol"], p["reason"]) for p in scan["pending"]] == \
+        [("WMT", "not_in_plan")]
+
+
+def test_run_scan_fallback_not_used_without_402():
+    """ไม่มีข้อมูลเฉย ๆ (ไม่ใช่ 402) → ไม่เรียกแหล่งสำรอง, reason ยังเป็น no_data"""
+    bars = _uptrend_prices()
+    calendar = [{"symbol": "AAPL", "date": bars[2]["date"], "time": "amc"}]
+    calls = []
+
+    def fallback(symbol, days):
+        calls.append(symbol)
+        return bars
+
+    cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
+    scan = run_scan(cfg, lookback_days=3,
+                    client=FakeClient(calendar, {}),
+                    fallback_prices_fn=fallback)
+    assert calls == []
+    assert [(p["symbol"], p["reason"]) for p in scan["pending"]] == \
+        [("AAPL", "no_data")]
+
+
 def test_run_scan_merges_secondary_calendar():
     """หุ้นที่แผนฟรีซ่อนจากปฏิทิน FMP ต้องถูกเติมจากแหล่งที่สอง
     → ตัวที่โดน 402 ขึ้น not_in_plan / ตัวซ้ำ+นอก universe ถูกกรอง"""
