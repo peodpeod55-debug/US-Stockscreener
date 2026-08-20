@@ -17,6 +17,7 @@ from bot.formatter import (
     format_reminders,
     format_scan,
     format_sl_breaks,
+    format_stats,
     format_weekly,
 )
 from bot.jobstate import PUSH_WEEKDAYS, already_ran, claim, due_catchup
@@ -25,7 +26,8 @@ from bot.lookup import LOOKUP_MAX, SymbolNotCovered, lookup_symbol, parse_ticker
 from bot.nasdaq_cal import fetch_nasdaq_earnings
 from bot.reminders import build_reminders
 from bot.screener import load_universe, run_scan, save_reports
-from bot.signals import record_signals, signals_since
+from bot.signals import load_signals, record_signals, signals_since
+from bot.stats import build_stats, summarize
 from bot.weekly import SIGNAL_LOOKBACK_DAYS, build_weekly_items
 from bot.yahoo_prices import fetch_yahoo_prices
 from bot.watchlist import (
@@ -139,7 +141,9 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "มีงบวันนี้/พรุ่งนี้ (บอก BMO/AMC)\n"
         f"หุ้นเกรด A/B จากสแกนเข้าเองอัตโนมัติ {AUTO_WATCH_DAYS} วัน\n\n"
         f"สรุป — ผลหุ้นที่บอทแจ้งย้อนหลัง {SIGNAL_LOOKBACK_DAYS} วัน\n"
-        "(+/-% ตั้งแต่วันแจ้ง, เคยหลุด SL ไหม)\n\n"
+        "(+/-% ตั้งแต่วันแจ้ง, เคยหลุด SL ไหม)\n"
+        "สถิติ — ผลงานสะสมทุกสัญญาณ:\n"
+        "win rate แยกเกรด, drift +5/+20/+60 วัน, อัตราหลุด SL\n\n"
         "Push อัตโนมัติ: อังคาร–เสาร์ 08:30 น.\n"
         "เตือนวันงบ: ทุกวัน 08:25 น.\n"
         "เตือนทะลุแนว (High 5วัน/3ด.ก่อนงบ)\n"
@@ -208,6 +212,13 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             logger.exception("weekly summary failed")
             await update.message.reply_text("⚠️ สรุปผลล้มเหลว ดู bot.log")
+        return
+    if update.message.text.strip() in ("สถิติ", "สถิติสะสม", "stats"):
+        try:
+            await _send_stats(context.bot, update.effective_chat.id)
+        except Exception:
+            logger.exception("stats failed")
+            await update.message.reply_text("⚠️ สถิติล้มเหลว ดู bot.log")
         return
     watch = parse_watch_command(update.message.text)
     if watch:
@@ -372,6 +383,29 @@ async def _send_weekly(bot, chat_id, notify_empty=False):
         await bot.send_message(
             chat_id=chat_id,
             text=f"ยังไม่มีหุ้นเกรด A/B ที่แจ้งใน {SIGNAL_LOOKBACK_DAYS} วันล่าสุด")
+
+
+async def _send_stats(bot, chat_id):
+    """สถิติสะสมทุกสัญญาณใน signals.json (พิมพ์ "สถิติ") — win rate/drift แยกเกรด"""
+    signals = load_signals()
+    if not signals:
+        await bot.send_message(
+            chat_id=chat_id,
+            text="ยังไม่มีสัญญาณสะสมใน signals.json — "
+                 "จะเริ่มเก็บอัตโนมัติเมื่อสแกนเจอหุ้นเกรด A/B")
+        return
+    client = FMPClient(api_key=CONFIG.fmp_api_key,
+                       max_api_calls=len(signals) + 2)
+    evaluated = await asyncio.to_thread(
+        build_stats, signals, lambda sym: _weekly_get_prices(client, sym))
+    msg = format_stats(summarize(evaluated), total=len(signals))
+    if msg:
+        await bot.send_message(chat_id=chat_id, text=msg)
+    else:
+        await bot.send_message(
+            chat_id=chat_id,
+            text=f"มี {len(signals)} สัญญาณแต่ยังประเมินไม่ได้ "
+                 "(ดึงราคาไม่ได้/ข้อมูลย้อนไม่ถึงวันแจ้ง) — ลองใหม่ภายหลัง")
 
 
 async def weekly_job(context: ContextTypes.DEFAULT_TYPE):

@@ -32,6 +32,7 @@ Telegram bot (`@Sakuro_usbot`) คัดกรองหุ้น US "อาก�
 | Price cache ข้าม job (20 ส.ค. รอบสาม) | `bot/fetch_cache.py` — in-memory TTL 60 นาที คีย์ `("prices", sym, 250)` / `("earnings", sym)` ใช้ร่วมกันใน lookup/breakout/scan/reminder/weekly → job เช้า 08:20/08:25/08:30 (และ catch-up) ดึงหุ้นชุดที่ทับซ้อนกันแค่รอบเดียว ตัดงบ API เกินครึ่ง · ค่าว่างไม่ cache (fetch ล้มลองใหม่ได้), list คืนสำเนากัน mutate, `tests/conftest.py` ล้าง cache ทุก test |
 | signals.json (20 ส.ค. รอบสาม) | `bot/signals.py` — บันทึกถาวรของสัญญาณ A/B ที่แจ้ง (dedup `(symbol, earnings_date)` ครั้งแรกที่แจ้งชนะ) เขียนจากทุกสแกน (manual + อัตโนมัติ) **track ใน git เป็น backup** (ไม่ gitignore) · weekly อ่านจาก `signals_since(30)` แทนการ glob `reports/scan_*.json` (ลบ `collect_signals` แล้ว — reports/ เหลือเป็น artifact อย่างเดียว) · เป็นฐานของฟีเจอร์สถิติผลงานระยะยาวต่อไป |
 | กราฟแนบแจ้งเตือน (20 ส.ค. รอบสี่) | `bot/chart.py` — `build_chart_png` (mplfinance, dep ใหม่ดึง matplotlib+pandas): แท่งเทียน 120 แท่ง (~6 เดือน) + volume + เส้นแนว high_5d เขียว / high_3m น้ำเงิน / SL แดง + เส้นประวันตอบรับงบ · แนบใน: ผลสแกน A/B, เตือนทะลุแนว/หลุด SL, lookup รายตัว (เพดาน `CHART_MAX=6` รูป/รอบ) — ราคาเอาจาก fetch_cache ที่เพิ่งดึงตอนสร้างข้อความ (**0 API call เพิ่ม**), `_send_chart` พังเงียบไม่ล้มข้อความหลัก · ตัวหนังสือบนภาพอังกฤษล้วน (ฟอนต์ default matplotlib ไม่มี glyph ไทย — caption เป็นไทยแทน) |
+| สถิติผลงานสะสม (20 ส.ค. รอบห้า) | พิมพ์ `สถิติ` / `สถิติสะสม` / `stats` — `bot/stats.py`: ประเมินทุกสัญญาณใน signals.json → drift เฉลี่ย +5/+20/+60 วันทำการ, win rate ต่อ horizon, อัตราเคยหลุด SL แยกเกรด A/B + รวม (`format_stats`) · นิยาม post-bars = `date > flag_date` ตรงกับ sl_hit ของ weekly (ตัวเลขสองรายงานไม่ขัดกัน) · สัญญาณที่ราคา 250 วันย้อนไม่ถึงวันแจ้ง (เก่ากว่า ~9 เดือน) ข้าม โชว์เป็น "ทั้งหมด X · ประเมินได้ Y" · ราคาใช้ fetcher เดิม (cache→FMP→yahoo) |
 
 ## 🔧 บั๊กที่เจอและแก้แล้วระหว่างทาง
 
@@ -55,7 +56,7 @@ Telegram bot (`@Sakuro_usbot`) คัดกรองหุ้น US "อาก�
    (seed `job_state.json` เป็น 20 ส.ค. ไว้แล้ว — catch-up จะไม่ยิงย้อนของวันที่ 20 ที่ user เห็นจาก manual scan แล้ว)
 3. (เสนอ) **patch fmp_client ต้นฉบับ** ใน earnings-trade-analyzer + pead-screener skills ให้ใช้ endpoint ใหม่ (ตามข้อ 1 ด้านบน)
 4. (ไอเดีย) ต่อยอด: ติดตาม drift รายสัปดาห์ด้วย logic pead-screener หลังหุ้นติดเกรด A/B
-5. (แผนรอบถัดไป) DR premium/discount เทียบหุ้นแม่ (ต้องหาแหล่งราคา DR จาก SET + USDTHB ที่เสถียร) · สถิติผลงานสะสมจาก signals.json (win rate แยกเกรด, drift 5/20/60 วัน — รอข้อมูลสะสมก่อน)
+5. (แผนรอบถัดไป) DR premium/discount เทียบหุ้นแม่ (ต้องหาแหล่งราคา DR จาก SET + USDTHB ที่เสถียร)
 
 ## วิธีใช้งาน / ดูแล
 

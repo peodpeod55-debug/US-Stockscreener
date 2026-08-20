@@ -1,4 +1,6 @@
 """จัดข้อความ Telegram (plain text ภาษาไทย)"""
+from bot.stats import HORIZONS
+
 MAX_LEN = 3800
 
 GRADE_ICON = {"A": "🔵", "B": "🟡"}
@@ -202,6 +204,30 @@ def format_weekly(items):
     avg = sum(it["pct"] for it in items) / n
     wins = sum(1 for it in items if it["pct"] > 0)
     lines += ["", f"รวม {n} ตัว · เฉลี่ย {_signed(avg)} · บวก {wins}/{n}"]
+    return "\n".join(lines)
+
+
+def format_stats(groups, total):
+    """สถิติสะสมทุกสัญญาณ (จาก stats.summarize) — None ถ้ายังไม่มีที่ประเมินได้"""
+    all_g = groups.get("all")
+    if not all_g or not all_g["n"]:
+        return None
+    lines = ["📊 สถิติสะสมสัญญาณที่บอทแจ้ง",
+             f"ทั้งหมด {total} สัญญาณ · ประเมินได้ {all_g['n']}"]
+    for key, label in (("A", "เกรด A"), ("B", "เกรด B"), ("all", "รวมทุกเกรด")):
+        g = groups.get(key)
+        if not g or not g["n"]:
+            continue
+        lines += ["", f"{GRADE_ICON.get(key, '⚪')} {label} — {g['n']} ตัว"]
+        for h in HORIZONS:
+            hh = g["horizons"][h]
+            if hh["n"]:
+                lines.append(f"  +{h} วัน: เฉลี่ย {_signed(hh['avg'])} · "
+                             f"ชนะ {hh['wins']}/{hh['n']}")
+            else:
+                lines.append(f"  +{h} วัน: ยังไม่มีตัวที่ถือถึง")
+        if g["sl_n"]:
+            lines.append(f"  🛑 เคยหลุด SL: {g['sl_hits']}/{g['sl_n']}")
     return "\n".join(lines)
 
 
