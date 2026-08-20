@@ -16,9 +16,12 @@ _HEADERS = {
 }
 
 
-def fetch_yahoo_prices(symbol, days=250, get=requests.get):
-    """แท่งราคารายวันล่าสุด ≤ days แท่ง หรือ None ถ้าดึง/parse ไม่ได้"""
-    ysym = symbol.upper().replace(".", "-")  # BRK.B → BRK-B
+def fetch_yahoo_prices(symbol, days=250, get=requests.get, raw=False):
+    """แท่งราคารายวันล่าสุด ≤ days แท่ง หรือ None ถ้าดึง/parse ไม่ได้
+
+    raw=True: ใช้สัญลักษณ์ตามที่ให้มา (DR ไทย .BK / FX =X) — ไม่แปลงจุดเป็นขีด
+    """
+    ysym = symbol.upper() if raw else symbol.upper().replace(".", "-")  # BRK.B → BRK-B
     rng = "2y" if days > 250 else "1y"
     try:
         resp = get(YAHOO_URL.format(symbol=ysym),

@@ -59,6 +59,13 @@ def test_dot_ticker_maps_to_dash():
     assert "/v8/finance/chart/BRK-B" in calls[0][0]
 
 
+def test_raw_symbol_keeps_dot_for_set_dr():
+    # DR ไทยบน Yahoo ใช้ suffix .BK — ห้ามแปลงจุดเป็นขีด
+    get, calls = make_get(make_payload([_ts(19)], [1.0], [1.0], [1.0], [1.0], [1]))
+    fetch_yahoo_prices("aapl01.bk", get=get, raw=True)
+    assert "/v8/finance/chart/AAPL01.BK" in calls[0][0]
+
+
 def test_null_bars_skipped():
     # วันหยุด/แท่งพัง Yahoo ใส่ null มาในทุก array
     payload = make_payload([_ts(18), _ts(19)],

@@ -207,6 +207,43 @@ def format_weekly(items):
     return "\n".join(lines)
 
 
+DR_PREMIUM_TH = 1.5             # |premium| เกินนี้ (%) ถึงติดป้ายแพง/ถูกกว่าปกติ
+
+
+def format_dr(symbol, name, items, hidden=0):
+    """รายงาน DR premium — items: [(dr_symbol, premium_dict | None)]
+
+    hidden: จำนวน DR ที่ถูกตัดเพราะเกินเพดาน (แจ้งท้ายข้อความ ไม่ตัดเงียบ)
+    """
+    lines = [f"🇹🇭 DR Premium — {name} ({symbol})"]
+    first = next((p for _, p in items if p), None)
+    if first:
+        lines.append(f"หุ้นแม่ ${first['us_price']:,.2f} ({first['us_date']}) · "
+                     f"USDTHB {first['fx']:.2f}")
+    for dr_sym, p in items:
+        lines.append("")
+        if p is None:
+            lines.append(f"{dr_sym}: ข้อมูลไม่พอ (DR ใหม่/ซื้อขายเบาบาง "
+                         "หรือดึงราคาไม่ได้)")
+            continue
+        lines.append(f"{dr_sym}: ฿{p['dr_price']:,.2f} ({p['dr_date']}) · "
+                     f"วอลุ่ม {_fmt_volume(p['volume'])}")
+        pct = p["premium_pct"]
+        if pct > DR_PREMIUM_TH:
+            verdict = "🔺 แพงกว่าปกติ"
+        elif pct < -DR_PREMIUM_TH:
+            verdict = "🔻 ถูกกว่าปกติ"
+        else:
+            verdict = "≈ ใกล้เคียงปกติ"
+        lines.append(f"  อิง ratio ปกติ {p['fair']:,.2f} บาท → "
+                     f"{_signed(pct)} {verdict}")
+    if hidden:
+        lines += ["", f"(ไม่แสดงอีก {hidden} DR — เกินเพดานต่อข้อความ)"]
+    lines += ["", f"(เทียบค่ากลาง ratio DR/หุ้นแม่ ย้อนหลัง — "
+                  "บวก = DR แพงกว่าช่วงที่ผ่านมา)"]
+    return "\n".join(lines)
+
+
 def format_stats(groups, total):
     """สถิติสะสมทุกสัญญาณ (จาก stats.summarize) — None ถ้ายังไม่มีที่ประเมินได้"""
     all_g = groups.get("all")

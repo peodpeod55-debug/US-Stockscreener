@@ -10,8 +10,10 @@ from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandl
 from bot import fetch_cache
 from bot.chart import build_chart_png
 from bot.config import PROJECT_ROOT, load_config
+from bot.dr import DR_MAX, compute_premium, parse_dr_command, parse_dr_symbols
 from bot.formatter import (
     format_breakouts,
+    format_dr,
     format_lookup,
     format_open_report,
     format_reminders,
@@ -144,6 +146,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "(+/-% ตั้งแต่วันแจ้ง, เคยหลุด SL ไหม)\n"
         "สถิติ — ผลงานสะสมทุกสัญญาณ:\n"
         "win rate แยกเกรด, drift +5/+20/+60 วัน, อัตราหลุด SL\n\n"
+        "dr NVDA — DR ไทยแพง/ถูกกว่าปกติแค่ไหน\n"
+        "(premium เทียบหุ้นแม่ × USDTHB, ทุก DR ของหุ้นนั้น)\n\n"
         "Push อัตโนมัติ: อังคาร–เสาร์ 08:30 น.\n"
         "เตือนวันงบ: ทุกวัน 08:25 น.\n"
         "เตือนทะลุแนว (High 5วัน/3ด.ก่อนงบ)\n"
@@ -201,6 +205,49 @@ async def _handle_watch_command(update, action, tickers):
     await update.message.reply_text("\n".join(parts))
 
 
+def _build_dr_report(sym, meta, drs):
+    """รายงาน DR premium ของหุ้นแม่หนึ่งตัว (blocking — เรียกใน to_thread)
+
+    ทุก fetch ผ่าน Yahoo (ฟรี ไม่กินงบ FMP) + fetch_cache 60 นาที
+    """
+    fx = fetch_cache.cached(
+        ("fx", "USDTHB"),
+        lambda: fetch_yahoo_prices("USDTHB=X", 120, raw=True))
+    us = fetch_cache.get(("prices", sym, 250))
+    if us is None:
+        us = fetch_yahoo_prices(sym, 250)
+        fetch_cache.put(("prices", sym, 250), us)
+    items = []
+    for d in drs[:DR_MAX]:
+        dr_prices = fetch_cache.cached(
+            ("dr", d), lambda d=d: fetch_yahoo_prices(f"{d}.BK", 120, raw=True))
+        items.append((d, compute_premium(dr_prices, us, fx)))
+    return format_dr(sym, meta["name"], items,
+                     hidden=max(0, len(drs) - DR_MAX))
+
+
+async def _handle_dr(update, tickers):
+    if not tickers:
+        await update.message.reply_text(
+            "ใช้: dr <ticker> เช่น dr NVDA — ดูว่า DR ไทยแพง/ถูกกว่าปกติแค่ไหน")
+        return
+    universe = load_universe()
+    for sym in tickers[:3]:
+        meta = universe.get(sym)
+        drs = parse_dr_symbols(meta["dr_symbols"]) if meta else []
+        if not drs:
+            await update.message.reply_text(f"{sym} ไม่มี DR ไทยใน universe")
+            continue
+        try:
+            msg = await asyncio.to_thread(_build_dr_report, sym, meta, drs)
+        except Exception:
+            logger.exception("dr report %s failed", sym)
+            await update.message.reply_text(
+                f"⚠️ ดึงข้อมูล DR ของ {sym} ล้มเหลว ลองใหม่อีกครั้งนะครับ")
+            continue
+        await update.message.reply_text(msg)
+
+
 async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """พิมพ์ ticker (ไม่ใช่คำสั่ง /) → snapshot ราคารายตัว · "ติดตาม ..." → watchlist"""
     if not _authorized(update):
@@ -219,6 +266,11 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             logger.exception("stats failed")
             await update.message.reply_text("⚠️ สถิติล้มเหลว ดู bot.log")
+        return
+    # เช็คก่อน lookup — "DR" เองก็เข้ารูป ticker จะโดนตีความผิดเป็นหุ้น
+    dr_cmd = parse_dr_command(update.message.text)
+    if dr_cmd is not None:
+        await _handle_dr(update, dr_cmd)
         return
     watch = parse_watch_command(update.message.text)
     if watch:
