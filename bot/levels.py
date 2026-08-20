@@ -1,0 +1,78 @@
+"""คำนวณระดับราคา (levels) สืบทอดจาก SET Earnings Breakout Screener
+
+daily_prices ทุกฟังก์ชัน = list[dict] most-recent-first
+คีย์: date, open, high, low, close, volume
+"""
+from datetime import date, timedelta
+
+
+def _find_index(daily_prices, target_date):
+    for i, bar in enumerate(daily_prices):
+        if bar.get("date") == target_date:
+            return i
+    return -1
+
+
+def _pct_vs(price, level):
+    if not level:
+        return None
+    return round((price - level) / level * 100, 2)
+
+
+def compute_levels(daily_prices, earnings_date, timing):
+    """คืน dict ระดับราคา หรือ None ถ้าหา reaction day (D0) ไม่ได้
+
+    D0: bmo → วันประกาศงบ, amc/unknown → วันซื้อขายถัดไป
+    (convention เดียวกับ gap_size_calculator)
+    """
+    earn_idx = _find_index(daily_prices, earnings_date)
+    if earn_idx == -1:
+        return None
+
+    d0 = earn_idx if (timing or "").lower() == "bmo" else earn_idx - 1
+    if d0 < 0:
+        return None  # งบ AMC เพิ่งออก ยังไม่มีวันตอบรับในข้อมูล
+
+    price = daily_prices[0]["close"]
+    pre = daily_prices[d0 + 1:]  # ทุกวันก่อน D0
+
+    high_5d = max((b["high"] for b in pre[:5]), default=None)
+    high_3m = max((b["high"] for b in pre[:63]), default=None)
+
+    # สัปดาห์ (จ–ศ) ที่จบล่าสุดก่อนสัปดาห์ของ bar ล่าสุด
+    last_d = date.fromisoformat(daily_prices[0]["date"])
+    prev_week = (last_d - timedelta(days=7)).isocalendar()[:2]
+    prev_week_high = max(
+        (b["high"] for b in daily_prices
+         if date.fromisoformat(b["date"]).isocalendar()[:2] == prev_week),
+        default=None,
+    )
+
+    # ความถี่ทำไฮใหม่: วันใน 10 วันล่าสุดที่ close > max high ของ 63 วันก่อนหน้าวันนั้น
+    new_high_count = 0
+    for i in range(min(10, len(daily_prices))):
+        prior = daily_prices[i + 1: i + 64]
+        if len(prior) >= 20 and daily_prices[i]["close"] > max(b["high"] for b in prior):
+            new_high_count += 1
+
+    sl = daily_prices[d0]["low"]
+    sl_pct = round((price - sl) / price * 100, 2) if price else None
+
+    vols = [b["volume"] for b in pre[:20]]
+    avg20 = sum(vols) / len(vols) if vols else 0
+    vol_ratio = round(daily_prices[d0]["volume"] / avg20, 2) if avg20 else None
+
+    return {
+        "reaction_date": daily_prices[d0]["date"],
+        "price": round(price, 2),
+        "high_5d": high_5d,
+        "pct_vs_high_5d": _pct_vs(price, high_5d),
+        "high_3m": high_3m,
+        "pct_vs_high_3m": _pct_vs(price, high_3m),
+        "prev_week_high": prev_week_high,
+        "broke_prev_week_high": (price > prev_week_high) if prev_week_high else None,
+        "new_high_count_10d": new_high_count,
+        "sl": sl,
+        "sl_pct": sl_pct,
+        "vol_ratio": vol_ratio,
+    }
