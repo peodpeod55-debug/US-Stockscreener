@@ -96,6 +96,47 @@ def test_run_scan_separates_plan_blocked_from_no_data():
     assert reasons == {"WMT": "not_in_plan", "AAPL": "no_data"}
 
 
+def test_run_scan_merges_secondary_calendar():
+    """หุ้นที่แผนฟรีซ่อนจากปฏิทิน FMP ต้องถูกเติมจากแหล่งที่สอง
+    → ตัวที่โดน 402 ขึ้น not_in_plan / ตัวซ้ำ+นอก universe ถูกกรอง"""
+    bars = _uptrend_prices()
+    earn_date = bars[2]["date"]
+    calendar = [{"symbol": "AAPL", "date": earn_date, "time": "amc"}]
+    seen_ranges = []
+
+    def secondary(from_date, to_date):
+        seen_ranges.append((from_date, to_date))
+        return [
+            {"symbol": "HD", "date": earn_date, "time": "bmo"},    # โดนซ่อน + 402
+            {"symbol": "AAPL", "date": earn_date, "time": None},   # ซ้ำกับ FMP
+            {"symbol": "ZZZZ", "date": earn_date, "time": None},   # นอก universe
+        ]
+
+    cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
+    scan = run_scan(cfg, lookback_days=3,
+                    client=Fake402Client(calendar, {"AAPL": bars},
+                                         blocked={"HD"}),
+                    secondary_cal_fn=secondary)
+    assert scan["reported_symbols"] == ["AAPL", "HD"]
+    assert seen_ranges == [(scan["from_date"], scan["to_date"])]
+    reasons = {p["symbol"]: p["reason"] for p in scan["pending"]}
+    assert reasons.get("HD") == "not_in_plan"
+
+
+def test_run_scan_secondary_failure_does_not_break_scan():
+    bars = _uptrend_prices()
+    calendar = [{"symbol": "AAPL", "date": bars[2]["date"], "time": "amc"}]
+
+    def broken(from_date, to_date):
+        raise ConnectionError("nasdaq down")
+
+    cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
+    scan = run_scan(cfg, lookback_days=3,
+                    client=FakeClient(calendar, {"AAPL": bars}),
+                    secondary_cal_fn=broken)
+    assert scan["reported_symbols"] == ["AAPL"]
+
+
 def test_run_scan_pending_when_reaction_day_missing():
     """งบ AMC ของ bar ล่าสุด → วันตอบรับยังไม่มีข้อมูล → ต้องเข้า pending"""
     bars = _uptrend_prices()

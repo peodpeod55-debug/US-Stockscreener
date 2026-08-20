@@ -33,8 +33,11 @@ def load_universe(csv_path=UNIVERSE_CSV):
     return universe
 
 
-def run_scan(config, lookback_days=None, client=None):
+def run_scan(config, lookback_days=None, client=None, secondary_cal_fn=None):
     """สแกนหุ้นออกงบใน universe ให้คะแนน 5-factor + levels
+
+    secondary_cal_fn(from_date, to_date) → ปฏิทินแหล่งที่สอง (รูปเดียวกับ FMP)
+    ไว้เติมหุ้นที่แผนฟรี FMP กรองออกจากปฏิทินเงียบ ๆ — แหล่งเสริมล้มได้โดยไม่พังสแกน
 
     คืน dict: from_date, to_date, universe_size, reported_symbols,
     candidates (เกรด A/B เรียง score มาก→น้อย), skipped_counts, api_stats
@@ -48,7 +51,13 @@ def run_scan(config, lookback_days=None, client=None):
     from_date = (today - timedelta(days=lookback)).strftime("%Y-%m-%d")
     to_date = today.strftime("%Y-%m-%d")
 
-    calendar = client.get_earnings_calendar(from_date, to_date) or []
+    calendar = list(client.get_earnings_calendar(from_date, to_date) or [])
+    if secondary_cal_fn:
+        try:
+            # ต่อท้าย: FMP มาก่อนจึงชนะเรื่อง date/timing, ตัวซ้ำโดน seen กรอง
+            calendar += secondary_cal_fn(from_date, to_date) or []
+        except Exception:
+            pass
     seen, reported = set(), []
     for e in calendar:
         sym = e.get("symbol")

@@ -10,6 +10,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandl
 from bot.config import PROJECT_ROOT, load_config
 from bot.formatter import format_lookup, format_reminders, format_scan
 from bot.lookup import LOOKUP_MAX, SymbolNotCovered, lookup_symbol, parse_tickers
+from bot.nasdaq_cal import fetch_nasdaq_earnings
 from bot.reminders import build_reminders
 from bot.screener import load_universe, run_scan, save_reports
 from bot.watchlist import (
@@ -39,7 +40,8 @@ def _authorized(update: Update) -> bool:
 
 
 async def _do_scan_and_send(bot, chat_id, lookback):
-    scan = await asyncio.to_thread(run_scan, CONFIG, lookback)
+    scan = await asyncio.to_thread(run_scan, CONFIG, lookback,
+                                   secondary_cal_fn=fetch_nasdaq_earnings)
     messages = format_scan(scan)
     save_reports(scan, messages)
     for msg in messages:
