@@ -17,6 +17,18 @@ def test_load_config_from_env(tmp_path, monkeypatch):
     assert cfg.lookback_days == 2
 
 
+def test_load_config_tolerates_utf8_bom(tmp_path, monkeypatch):
+    """ไฟล์ .env ที่เซฟจาก Notepad/PowerShell มักมี BOM — ต้องไม่ทำให้ key แรกพัง"""
+    for k in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "FMP_API_KEY"):
+        monkeypatch.delenv(k, raising=False)
+    env = tmp_path / ".env"
+    env.write_bytes(
+        b"\xef\xbb\xbfTELEGRAM_BOT_TOKEN=tok123\nTELEGRAM_CHAT_ID=111\nFMP_API_KEY=fmp456\n"
+    )
+    cfg = load_config(env)
+    assert cfg.telegram_token == "tok123"
+
+
 def test_load_config_missing_raises(tmp_path, monkeypatch):
     for k in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "FMP_API_KEY"):
         monkeypatch.delenv(k, raising=False)

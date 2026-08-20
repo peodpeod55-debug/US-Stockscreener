@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 from bot.config import PROJECT_ROOT
 
-load_dotenv(PROJECT_ROOT / ".env")
+load_dotenv(PROJECT_ROOT / ".env", encoding="utf-8-sig")
 token = os.environ.get("TELEGRAM_BOT_TOKEN")
 if not token or token == "PENDING":
     raise SystemExit("ยังไม่ได้ใส่ TELEGRAM_BOT_TOKEN ใน .env")

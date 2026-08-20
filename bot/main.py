@@ -18,6 +18,8 @@ logging.basicConfig(
     filename=PROJECT_ROOT / "bot.log", level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
+# httpx log URL เต็มของ Telegram API ซึ่งมี bot token — ห้ามให้ลง log
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger("bot")
 CONFIG = load_config()
 

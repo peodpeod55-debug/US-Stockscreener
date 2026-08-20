@@ -18,7 +18,8 @@ class Config:
 
 
 def load_config(env_path: Path | None = None) -> Config:
-    load_dotenv(env_path or PROJECT_ROOT / ".env")
+    # utf-8-sig: ไฟล์ที่เซฟจาก Notepad/PowerShell มักมี BOM ซึ่งทำ key แรกพัง
+    load_dotenv(env_path or PROJECT_ROOT / ".env", encoding="utf-8-sig")
     required = ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "FMP_API_KEY"]
     missing = [k for k in required if not os.environ.get(k)]
     if missing:
