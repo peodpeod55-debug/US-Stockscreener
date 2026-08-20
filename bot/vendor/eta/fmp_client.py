@@ -89,6 +89,9 @@ class FMPClient:
         self.max_retries = 1
         self.api_calls_made = 0
         self.max_api_calls = max_api_calls
+        # FMP free tier restricts some symbols (HTTP 402) — callers can
+        # reset + inspect this flag to distinguish "not covered" from "not found"
+        self.saw_402 = False
         # Circuit breaker: track consecutive failures per endpoint URL prefix
         self._endpoint_failures: dict[str, int] = {}
         self._disabled_endpoints: set[str] = set()
@@ -131,6 +134,8 @@ class FMPClient:
                     self.rate_limit_reached = True
                     return None
             else:
+                if response.status_code == 402:
+                    self.saw_402 = True
                 if not quiet:
                     print(
                         f"ERROR: API request failed: {response.status_code} - {response.text[:200]}",
@@ -255,6 +260,40 @@ class FMPClient:
                 profiles[symbol] = profile
 
         return profiles
+
+    @staticmethod
+    def _valid_earnings_rows(data) -> bool:
+        return (
+            isinstance(data, list)
+            and len(data) > 0
+            and isinstance(data[0], dict)
+            and "date" in data[0]
+        )
+
+    def get_earnings_dates(self, symbol: str) -> Optional[list]:
+        """Fetch past + upcoming earnings dates for one symbol.
+
+        Tries stable/earnings first (new keys), falls back to
+        api/v3/historical/earning_calendar/{symbol} (legacy keys).
+
+        Returns:
+            List of dicts with at least a "date" key, or None on failure.
+        """
+        cache_key = f"earnings_dates_{symbol}"
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+
+        data = self._rate_limited_get(
+            f"{self.STABLE_URL}/earnings", {"symbol": symbol}, quiet=True
+        )
+        if not self._valid_earnings_rows(data):
+            data = self._rate_limited_get(
+                f"{self.BASE_URL}/historical/earning_calendar/{symbol}"
+            )
+        if self._valid_earnings_rows(data):
+            self.cache[cache_key] = data
+            return data
+        return None
 
     def get_historical_prices(self, symbol: str, days: int = 250) -> Optional[list[dict]]:
         """Fetch historical daily OHLCV data for a symbol.

@@ -5,11 +5,13 @@ from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
 from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 from bot.config import PROJECT_ROOT, load_config
-from bot.formatter import format_scan
-from bot.screener import run_scan, save_reports
+from bot.formatter import format_lookup, format_scan
+from bot.lookup import LOOKUP_MAX, SymbolNotCovered, lookup_symbol, parse_tickers
+from bot.screener import load_universe, run_scan, save_reports
+from fmp_client import FMPClient  # sys.path ถูกตั้งโดย bot.screener/bot.lookup แล้ว
 
 TZ = ZoneInfo("Asia/Bangkok")
 PUSH_WEEKDAYS = {1, 2, 3, 4, 5}  # date.weekday(): จ=0 → อังคาร(1)–เสาร์(5)
@@ -62,8 +64,46 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/scan — สแกนย้อนหลัง 2 วัน\n"
         "/scan 7 — สแกนย้อนหลัง 7 วัน\n"
         "/help — วิธีใช้\n\n"
+        "ดูราคารายตัว: พิมพ์ ticker ได้เลย เช่น NVDA\n"
+        f"หลายตัวพร้อมกัน (สูงสุด {LOOKUP_MAX}): NVDA TSLA AAPL\n"
+        "ได้ราคาปิดล่าสุด, %เปลี่ยน, วอลุ่ม, วันงบ,\n"
+        "สัญญาณหลังงบ + เกรด, High/Low 5วัน/3ด./52w\n\n"
         "Push อัตโนมัติ: อังคาร–เสาร์ 08:30 น."
     )
+
+
+async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """พิมพ์ ticker (ไม่ใช่คำสั่ง /) → snapshot ราคารายตัว"""
+    if not _authorized(update):
+        return
+    tickers = parse_tickers(update.message.text)
+    if not tickers:
+        await update.message.reply_text(
+            "พิมพ์ ticker หุ้น US เช่น NVDA หรือหลายตัว: NVDA TSLA "
+            f"(สูงสุด {LOOKUP_MAX} ตัว) · ดูคำสั่งอื่น: /help")
+        return
+    # client ใหม่ต่อข้อความ: งบ API เล็กๆ พอสำหรับ 2 calls/ตัว กันข้อความเดียวเผางบทั้งวัน
+    client = FMPClient(api_key=CONFIG.fmp_api_key,
+                       max_api_calls=3 * len(tickers))
+    universe = load_universe()
+    for sym in tickers:
+        try:
+            snap = await asyncio.to_thread(lookup_symbol, client, sym, universe)
+        except SymbolNotCovered:
+            await update.message.reply_text(
+                f"🔒 ดึง {sym} ไม่ได้ — ticker ไม่ถูกต้อง "
+                "หรือหุ้นตัวนี้ไม่อยู่ในแผนฟรีของ FMP (ฟรีทีร์จำกัดรายชื่อหุ้น)")
+            continue
+        except Exception:
+            logger.exception("lookup %s failed", sym)
+            await update.message.reply_text(
+                f"⚠️ ดึงข้อมูล {sym} ล้มเหลว ลองใหม่อีกครั้งนะครับ")
+            continue
+        if snap is None:
+            await update.message.reply_text(
+                f"❌ ไม่พบข้อมูล {sym} — เช็ค ticker เช่น NVDA / AAPL / BRK.B")
+            continue
+        await update.message.reply_text(format_lookup(snap))
 
 
 async def daily_job(context: ContextTypes.DEFAULT_TYPE):
@@ -85,6 +125,7 @@ def main():
     app = Application.builder().token(CONFIG.telegram_token).build()
     app.add_handler(CommandHandler(["start", "help"], cmd_help))
     app.add_handler(CommandHandler("scan", cmd_scan))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
     app.job_queue.run_daily(daily_job, time=time(8, 30, tzinfo=TZ))
     logger.info("bot starting")
     app.run_polling(allowed_updates=Update.ALL_TYPES)

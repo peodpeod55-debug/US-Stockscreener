@@ -21,6 +21,7 @@ Telegram bot (`@Sakuro_usbot`) คัดกรองหุ้น US "อาก�
 | Telegram ทดสอบจริง | token + chat_id (808446026) ใช้ได้, user สั่ง `/scan 7` จากมือถือสำเร็จครบวงจร |
 | รันถาวร | Startup shortcut → `start_bot_hidden.vbs` → `run_bot.bat` (restart loop 60s) — bot รัน detached อยู่ |
 | GitHub | https://github.com/peodpeod55-debug/US-Stockscreener branch `feature/telegram-earnings-bot` push ครบ |
+| Lookup รายตัว (20 ส.ค. เย็น) | พิมพ์ ticker หาบอท (สูงสุด 5 ตัว/ข้อความ) → snapshot ราคา EOD, %เปลี่ยน, วอลุ่ม, วันงบล่าสุด/ถัดไป, สัญญาณหลังงบ+เกรด, H/L 5วัน/3ด./52w, DR — `bot/lookup.py` + `format_lookup` + `get_earnings_dates` (2 API calls/ตัว) |
 
 ## 🔧 บั๊กที่เจอและแก้แล้วระหว่างทาง
 
@@ -31,6 +32,10 @@ Telegram bot (`@Sakuro_usbot`) คัดกรองหุ้น US "อาก�
 3. **httpx log URL ที่มี bot token ลง bot.log** → ปิด log level + ล้าง log เก่า (commit `d3792ba`)
 4. **Register-ScheduledTask ต้องใช้ admin บนเครื่องนี้** → เปลี่ยนเป็น Startup-folder shortcut (commit `c9a924b`)
 5. หุ้นที่งบเพิ่งออก (ยังไม่มีวันตอบรับ) แสดงเป็น "⏳ รอวันตอบรับงบ" ไม่หายเงียบ (commit `9c5bad8`)
+6. **แผนฟรี FMP จำกัดรายชื่อหุ้น (HTTP 402)** — เจอตอนทำ lookup: HD โดนบล็อก, NVDA/WMT/TGT ใช้ได้
+   และ ticker ที่ไม่มีจริงก็ได้ 402 เหมือนกัน (แยกไม่ได้) → client มีธง `saw_402`, lookup raise
+   `SymbolNotCovered` แจ้งผู้ใช้ตรงๆ ⚠️ scan อาจข้ามหุ้น universe บางตัวเงียบๆ ด้วยเหตุเดียวกัน
+   (ขึ้นเป็น pending "no_data")
 
 ## ⏳ ค้างอยู่ / งานต่อ session หน้า
 
