@@ -1,0 +1,111 @@
+from datetime import date, timedelta
+from pathlib import Path
+
+from bot.config import Config
+from bot.screener import load_universe, run_scan
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_load_universe_dr_or_sp500():
+    uni = load_universe(ROOT / "us_stock_list.csv")
+    assert "AAPL" in uni                       # DR + SP500
+    assert "ABT" in uni                        # SP500 เท่านั้น (dr=N)
+    assert "AAOI" not in uni                   # ไม่มี DR ไม่อยู่ SP500
+    assert uni["AAPL"]["dr_symbols"].startswith("AAPL01")
+    assert 400 < len(uni) < 700
+
+
+class FakeClient:
+    """FMPClient ปลอม: มีหุ้น 2 ตัวออกงบ — ตัวหนึ่งใน universe อีกตัวไม่อยู่"""
+
+    def __init__(self, calendar, prices):
+        self._calendar = calendar
+        self._prices = prices
+        self.api_calls_made = 0
+
+    def get_earnings_calendar(self, from_date, to_date):
+        return self._calendar
+
+    def get_historical_prices(self, symbol, days=250):
+        return self._prices.get(symbol)
+
+    def get_api_stats(self):
+        return {"api_calls_made": 1}
+
+
+def _uptrend_prices(n=250):
+    bars, d, p = [], date(2026, 8, 19), 500.0
+    while len(bars) < n:
+        if d.weekday() < 5:
+            bars.append({"date": d.isoformat(), "open": p, "high": p + 2,
+                         "low": p - 2, "close": p, "volume": 2_000_000})
+            p -= 1.5
+        d -= timedelta(days=1)
+    return bars
+
+
+def test_run_scan_filters_to_universe_and_grades():
+    bars = _uptrend_prices()
+    earn_date = bars[2]["date"]
+    calendar = [
+        {"symbol": "AAPL", "date": earn_date, "time": "amc"},
+        {"symbol": "ZZZZ", "date": earn_date, "time": "amc"},  # นอก universe
+    ]
+    cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
+    scan = run_scan(cfg, lookback_days=3,
+                    client=FakeClient(calendar, {"AAPL": bars}))
+    assert scan["reported_symbols"] == ["AAPL"]
+    all_syms = [c["symbol"] for c in scan["candidates"]]
+    total = (len(all_syms) + scan["skipped_counts"]["C"]
+             + scan["skipped_counts"]["D"] + len(scan["pending"]))
+    assert total == 1
+    for c in scan["candidates"]:
+        assert c["grade"] in ("A", "B")
+        assert c["levels"]["price"] > 0
+        assert c["dr_symbols"]
+
+
+class Fake402Client(FakeClient):
+    """เหมือน FakeClient แต่หุ้นใน blocked ตอบ HTTP 402 (ตั้งธง saw_402)"""
+
+    def __init__(self, calendar, prices, blocked=()):
+        super().__init__(calendar, prices)
+        self.blocked = set(blocked)
+        self.saw_402 = False
+
+    def get_historical_prices(self, symbol, days=250):
+        if symbol in self.blocked:
+            self.saw_402 = True
+            return None
+        return super().get_historical_prices(symbol, days)
+
+
+def test_run_scan_separates_plan_blocked_from_no_data():
+    """402 → reason not_in_plan · ไม่มีข้อมูลเฉย ๆ → no_data (ธงต้อง reset ต่อตัว)"""
+    bars = _uptrend_prices()
+    earn_date = bars[2]["date"]
+    calendar = [
+        {"symbol": "WMT", "date": earn_date, "time": "amc"},   # โดน 402 ก่อน
+        {"symbol": "AAPL", "date": earn_date, "time": "amc"},  # ไม่มีข้อมูลเฉย ๆ
+    ]
+    cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
+    scan = run_scan(cfg, lookback_days=3,
+                    client=Fake402Client(calendar, {}, blocked={"WMT"}))
+    reasons = {p["symbol"]: p["reason"] for p in scan["pending"]}
+    assert reasons == {"WMT": "not_in_plan", "AAPL": "no_data"}
+
+
+def test_run_scan_pending_when_reaction_day_missing():
+    """งบ AMC ของ bar ล่าสุด → วันตอบรับยังไม่มีข้อมูล → ต้องเข้า pending"""
+    bars = _uptrend_prices()
+    calendar = [
+        {"symbol": "WMT", "date": bars[0]["date"], "time": "amc"},   # รอวันตอบรับ
+        {"symbol": "AAPL", "date": bars[0]["date"], "time": None},   # ไม่มีข้อมูลราคา
+    ]
+    cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
+    scan = run_scan(cfg, lookback_days=3,
+                    client=FakeClient(calendar, {"WMT": bars}))
+    pending_syms = {p["symbol"] for p in scan["pending"]}
+    assert pending_syms == {"WMT", "AAPL"}
+    assert scan["candidates"] == []
