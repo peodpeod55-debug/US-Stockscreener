@@ -41,8 +41,8 @@ Telegram bot (`@Sakuro_usbot`) คัดกรองหุ้น US "อาก�
 
 ## ⏳ ค้างอยู่ / งานต่อ session หน้า
 
-1. **เปิด PR** (คลิกเดียว): https://github.com/peodpeod55-debug/US-Stockscreener/pull/new/feature/telegram-earnings-bot
-   แล้ว merge เข้า master
+1. ~~เปิด PR~~ ✅ PR #1 merge แล้ว (20 ส.ค.) — **ต่อจากนี้ทำงานบน `master` ตรงๆ ไม่ใช้ feature branch**
+   (branch `feature/telegram-earnings-bot` ลบในเครื่องแล้ว เหลือบน GitHub ลบได้จากหน้า PR)
 2. **เช็คผล push อัตโนมัติรอบแรก** — พฤหัส 21 ส.ค. 08:30 น. จะได้เกรดของ **WMT + TGT** ที่เพิ่งออกงบ
 3. (เสนอ) **patch fmp_client ต้นฉบับ** ใน earnings-trade-analyzer + pead-screener skills ให้ใช้ endpoint ใหม่ (ตามข้อ 1 ด้านบน)
 4. (ไอเดีย) ต่อยอด: ติดตาม drift รายสัปดาห์ด้วย logic pead-screener หลังหุ้นติดเกรด A/B
