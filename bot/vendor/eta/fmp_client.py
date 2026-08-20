@@ -29,6 +29,13 @@ except ImportError:
 # --- FMP endpoint fallback: stable (new users) -> v3 (legacy users) ---
 
 
+def _stable_eod_url(base, symbols_str, params):
+    """stable/historical-price-eod/full?symbol=SPY (ignores timeseries; caller slices)"""
+    params.pop("timeseries", None)
+    params["symbol"] = symbols_str
+    return base, params
+
+
 def _stable_hist_url(base, symbols_str, params):
     """stable/historical-price-full?symbol=SPY&timeseries=90"""
     params["symbol"] = symbols_str
@@ -42,6 +49,8 @@ def _v3_hist_url(base, symbols_str, params):
 
 _FMP_ENDPOINTS = {
     "historical": [
+        # 2026-08: FMP retired historical-price-full for new keys; eod/full is current
+        ("https://financialmodelingprep.com/stable/historical-price-eod/full", _stable_eod_url),
         ("https://financialmodelingprep.com/stable/historical-price-full", _stable_hist_url),
         ("https://financialmodelingprep.com/api/v3/historical-price-full", _v3_hist_url),
     ],
@@ -160,6 +169,10 @@ class FMPClient:
             # Shape validation: reject truthy-but-wrong-shape responses
             valid = True
             if endpoint_key == "historical":
+                if isinstance(data, list) and isinstance(data[0], dict) and "close" in data[0]:
+                    # stable eod flat-list format (most-recent-first) -> v3 single format
+                    self._endpoint_failures[base_url] = 0
+                    return {"symbol": symbols_str, "historical": data}
                 if not isinstance(data, dict):
                     valid = False
                 elif "historicalStockList" in data:
@@ -259,7 +272,7 @@ class FMPClient:
 
         data = self._request_with_fallback("historical", symbol, {"timeseries": days})
         if data and "historical" in data:
-            result = data["historical"]
+            result = data["historical"][:days]
             self.cache[cache_key] = result
             return result
         return None
