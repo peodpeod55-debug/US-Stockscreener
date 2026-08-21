@@ -8,6 +8,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 from bot import fetch_cache
+from bot.breakouts import record_breakouts
 from bot.chart import build_chart_png
 from bot.config import PROJECT_ROOT, load_config
 from bot.dr import DR_MAX, compute_premium, parse_dr_command, parse_dr_symbols
@@ -383,6 +384,8 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
             if snap and sym in auto and below_low_5d(snap.get("levels")):
                 dead.append(sym)
         removed = auto_remove(dead) if dead else []
+        # เหตุการณ์ทะลุแนวลง breakouts.json — gem-lab อ่านไปเป็น candidate ยิง Gem
+        record_breakouts(alerts)
         for msg in (format_breakouts(alerts), format_sl_breaks(sl_alerts),
                     format_low_breaks(low_alerts, removed)):
             if msg:
