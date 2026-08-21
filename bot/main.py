@@ -7,10 +7,25 @@ from zoneinfo import ZoneInfo
 
 from telegram import Update
 from telegram.error import Conflict, NetworkError
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import (
+    Application,
+    CallbackQueryHandler,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 
 from bot import fetch_cache, instance_lock
 from bot.breakouts import record_breakouts
+from bot.buttons import (
+    build_unwatch_markup,
+    build_watch_all_markup,
+    build_watch_markup,
+    drop_button,
+    mark_pressed,
+    parse_callback,
+)
 from bot.chart import build_chart_png
 from bot.config import PROJECT_ROOT, load_config
 from bot.dr import DR_MAX, compute_premium, parse_dr_command, parse_dr_symbols
@@ -48,7 +63,7 @@ from bot.watchlist import (
     auto_remove,
     load_watchlist,
     parse_watch_command,
-    remove_symbols,
+    remove_everywhere,
 )
 from fmp_client import FMPClient  # sys.path ถูกตั้งโดย bot.screener/bot.lookup แล้ว
 
@@ -82,7 +97,8 @@ def _authorized(update: Update) -> bool:
     return str(update.effective_chat.id) == str(CONFIG.chat_id)
 
 
-async def _send_chart(bot, chat_id, symbol, levels=None, caption=None):
+async def _send_chart(bot, chat_id, symbol, levels=None, caption=None,
+                      reply_markup=None):
     """แนบกราฟจากราคาใน cache (เพิ่งดึงตอนสร้างข้อความ — ไม่มี API call เพิ่ม)
 
     cache หมดอายุ/วาดพัง → ข้ามเงียบๆ ไม่ล้มข้อความหลักที่ส่งไปแล้ว
@@ -92,7 +108,8 @@ async def _send_chart(bot, chat_id, symbol, levels=None, caption=None):
         png = await asyncio.to_thread(build_chart_png, symbol, prices, levels)
         if png:
             await bot.send_photo(chat_id=chat_id, photo=png,
-                                 caption=caption or symbol)
+                                 caption=caption or symbol,
+                                 reply_markup=reply_markup)
     except Exception:
         logger.exception("chart %s failed", symbol)
 
@@ -105,12 +122,23 @@ async def _do_scan_and_send(bot, chat_id, lookback):
     save_reports(scan, messages)
     # บันทึกสัญญาณ A/B ลง signals.json (dedup ต่อรอบงบ) — ฐานของสรุปรายสัปดาห์
     record_signals(scan["candidates"], scan["to_date"])
-    for msg in messages:
-        await bot.send_message(chat_id=chat_id, text=msg)
+    # ปุ่มรวม "ติดตามถาวรทั้งหมด" ใต้ข้อความสแกนฉบับสุดท้าย (มี candidate ≥2)
+    manual = set(load_watchlist())
+    all_markup = build_watch_all_markup(
+        [c["symbol"] for c in scan["candidates"] if c["symbol"] not in manual],
+        permanent=True)
+    for i, msg in enumerate(messages):
+        await bot.send_message(
+            chat_id=chat_id, text=msg,
+            reply_markup=all_markup if i == len(messages) - 1 else None)
     for c in scan["candidates"][:CHART_MAX]:
+        # in_auto: หุ้น A/B กำลังเข้า auto-watch ด้านล่าง — ปุ่มเลื่อนขั้นเป็นติดตามถาวร
         await _send_chart(bot, chat_id, c["symbol"], c["levels"],
                           caption=f"📈 {c['symbol']} — เกรด {c['grade']} "
-                                  f"({c['score']:.0f}/100)")
+                                  f"({c['score']:.0f}/100)",
+                          reply_markup=build_watch_markup(
+                              c["symbol"], in_manual=c["symbol"] in manual,
+                              in_auto=True))
     # หุ้นเกรด A/B เข้า watchlist อัตโนมัติ → ได้เตือนทะลุแนว/วันงบต่อเอง
     added = auto_add([c["symbol"] for c in scan["candidates"]])
     if added:
@@ -202,17 +230,15 @@ async def _handle_watch_command(update, action, tickers):
                 logger.exception("watch detail %s failed", sym)
                 snap = None
             items.append((sym, snap))
-        await update.message.reply_text(format_watch_detail(items, auto))
+        # ปุ่ม 🗑 รายตัว — กดเอาออกได้เลย ต่อเนื่องกี่ตัวก็ได้ (ปุ่มที่กดหายไปทีละปุ่ม)
+        await update.message.reply_text(format_watch_detail(items, auto),
+                                        reply_markup=build_unwatch_markup(symbols))
         return
     if action == "remove":
         if not tickers:
             await update.message.reply_text("ใช้: เลิกติดตาม <ticker> เช่น เลิกติดตาม NVDA")
             return
-        r = remove_symbols(tickers)
-        auto_removed = auto_remove(tickers)
-        removed = r["removed"] + [s for s in auto_removed
-                                  if s not in r["removed"]]
-        missing = [s for s in r["missing"] if s not in auto_removed]
+        removed, missing = remove_everywhere(tickers)
         parts = []
         if removed:
             parts.append(f"🗑 เอาออกแล้ว: {', '.join(removed)}")
@@ -315,6 +341,9 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     client = FMPClient(api_key=CONFIG.fmp_api_key,
                        max_api_calls=3 * len(tickers))
     universe = load_universe()
+    manual = set(load_watchlist())
+    auto = set(active_auto())
+    all_row_pending = len(tickers) >= 2   # แถว "ติดตามทั้งชุด" ติดข้อความแรกที่สำเร็จ
     for sym in tickers:
         try:
             snap = await asyncio.to_thread(lookup_symbol, client, sym, universe,
@@ -333,7 +362,13 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(
                 f"❌ ไม่พบข้อมูล {sym} — เช็ค ticker เช่น NVDA / AAPL / BRK.B")
             continue
-        await update.message.reply_text(format_lookup(snap))
+        markup = build_watch_markup(
+            sym, in_manual=sym in manual, in_auto=sym in auto,
+            all_symbols=tickers if all_row_pending else None)
+        if all_row_pending:
+            all_row_pending = False
+        await update.message.reply_text(format_lookup(snap),
+                                        reply_markup=markup)
         await _send_chart(context.bot, update.effective_chat.id, sym,
                           snap.get("levels"),
                           caption=f"{sym} — ปิด {snap['price']:,.2f}")
@@ -566,6 +601,56 @@ async def catchup_job(context: ContextTypes.DEFAULT_TYPE):
         await jobs[name](context)
 
 
+async def _safe_answer(query, text=None):
+    """ตอบ callback เสมอ (ปุ่มค้างหมุนติ้วถ้าไม่ตอบ) — query เก่าเกิน answer ล้มได้ ไม่เป็นไร"""
+    try:
+        await query.answer(text)
+    except Exception as e:
+        logger.warning("callback answer failed (query เก่าจากช่วงบอทปิด?): %s", e)
+
+
+async def on_button(update, context):
+    """ปุ่ม inline: w:/wa: เพิ่ม watchlist · u: เอาออก
+
+    ลำดับสำคัญ: ทำงานจริงก่อน แล้วค่อย answer/edit — สองอย่างหลังล้มได้
+    (query เก่า, ข้อความ >48 ชม. แก้ไม่ได้) โดยเจตนาผู้ใช้ต้องไม่สูญ
+    """
+    query = update.callback_query
+    if query is None:
+        return
+    if str(query.from_user.id) != str(CONFIG.chat_id):
+        await _safe_answer(query)
+        return
+    parsed = parse_callback(query.data or "")
+    if parsed is None:                       # ปุ่ม ✓ ที่ปลดชนวนแล้ว / data ปลอม
+        await _safe_answer(query)
+        return
+    action, syms = parsed
+    if action == "watch":
+        r = add_symbols(syms)
+        parts = []
+        if r["added"]:
+            parts.append(f"✅ ติดตาม: {', '.join(r['added'])}")
+        if r["already"]:
+            parts.append(f"อยู่แล้ว: {', '.join(r['already'])}")
+        if r["full"]:
+            parts.append(f"⚠️ เต็ม {WATCHLIST_MAX} ตัว: {', '.join(r['full'])}")
+        toast, transform = " · ".join(parts), mark_pressed
+    else:
+        removed, missing = remove_everywhere(syms)
+        toast = (f"🗑 เอา {', '.join(removed)} ออกแล้ว" if removed
+                 else f"{', '.join(missing)} ไม่ได้ติดตามอยู่แล้ว")
+        transform = drop_button
+    await _safe_answer(query, toast)
+    old = getattr(query.message, "reply_markup", None)
+    if old is None:
+        return
+    try:
+        await query.edit_message_reply_markup(reply_markup=transform(old, query.data))
+    except Exception as e:
+        logger.warning("edit reply markup failed (ข้อความเก่า?): %s", e)
+
+
 async def on_error(update, context):
     """error กลางของ PTB — เดิมไม่มี ทุก error ลง log เป็น "No error handlers are registered" """
     err = context.error
@@ -587,6 +672,7 @@ def build_app(config):
     app.add_handler(CommandHandler(["start", "help"], cmd_help, filters=new_msg))
     app.add_handler(CommandHandler("scan", cmd_scan, filters=new_msg))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & new_msg, on_text))
+    app.add_handler(CallbackQueryHandler(on_button))
     app.add_error_handler(on_error)
     app.job_queue.run_daily(daily_job, time=time(8, 30, tzinfo=TZ))
     # เตือนวันงบรันทุกวัน (ไม่เว้นอาทิตย์/จันทร์ — งบวันจันทร์ต้องเตือนตั้งแต่อาทิตย์)

@@ -161,3 +161,17 @@ def test_all_watched_union_dedup(tmp_path):
         "OLD": "2026-01-01",                              # หมดอายุ
     }, auto_p)
     assert all_watched(manual_p, auto_p, today=TODAY) == ["NVDA", "WMT", "TGT"]
+
+
+def test_remove_everywhere_covers_manual_and_auto(tmp_path):
+    """ลบทีเดียวทั้งสองที่ (logic เดิมของ เลิกติดตาม ที่แยกไว้ใช้ร่วมกับปุ่ม 🗑)"""
+    from bot.watchlist import remove_everywhere
+    auto_p, manual_p = _paths(tmp_path)
+    add_symbols(["NVDA"], manual_p)
+    save_auto_watch({"TGT": "2026-08-20"}, auto_p)
+    removed, missing = remove_everywhere(["NVDA", "TGT", "XXX"],
+                                         manual_path=manual_p, auto_path=auto_p)
+    assert removed == ["NVDA", "TGT"]
+    assert missing == ["XXX"]
+    assert load_watchlist(manual_p) == []
+    assert load_auto_watch(auto_p) == {}

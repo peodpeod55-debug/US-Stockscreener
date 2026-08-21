@@ -126,6 +126,20 @@ def auto_add(symbols, path=AUTO_WATCH_PATH, manual_path=WATCHLIST_PATH,
     return added
 
 
+def remove_everywhere(symbols, manual_path=WATCHLIST_PATH,
+                      auto_path=AUTO_WATCH_PATH):
+    """เลิกติดตามจากทั้ง manual และ auto ในทีเดียว — คืน (removed, missing)
+
+    logic เดิมของคำสั่ง เลิกติดตาม แยกออกมาให้ปุ่ม 🗑 ใช้ร่วมกัน
+    """
+    r = remove_symbols(symbols, manual_path)
+    auto_removed = auto_remove(symbols, auto_path)
+    removed = r["removed"] + [s for s in auto_removed
+                              if s not in r["removed"]]
+    missing = [s for s in r["missing"] if s not in auto_removed]
+    return removed, missing
+
+
 def auto_remove(symbols, path=AUTO_WATCH_PATH):
     """เอาออกจาก auto-watch (ตอน user สั่งเลิกติดตาม) — คืนตัวที่ลบจริง"""
     data = load_auto_watch(path)
