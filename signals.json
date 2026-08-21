@@ -1,1 +1,26 @@
-[]
+[
+  {
+    "symbol": "EL",
+    "name": "Estee Lauder Companies, Inc. (The)",
+    "grade": "B",
+    "score": 79.5,
+    "earnings_date": "2026-08-19",
+    "timing": "bmo*",
+    "flag_date": "2026-08-21",
+    "flag_price": 96.15,
+    "sl": 93.5,
+    "dr_symbols": "ESTEE80"
+  },
+  {
+    "symbol": "TGT",
+    "name": "Target Corporation",
+    "grade": "B",
+    "score": 72.8,
+    "earnings_date": "2026-08-19",
+    "timing": "bmo*",
+    "flag_date": "2026-08-21",
+    "flag_price": 158.25,
+    "sl": 146.21,
+    "dr_symbols": ""
+  }
+]
