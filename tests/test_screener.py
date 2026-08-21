@@ -205,3 +205,71 @@ def test_run_scan_pending_when_reaction_day_missing():
     pending_syms = {p["symbol"] for p in scan["pending"]}
     assert pending_syms == {"WMT", "AAPL"}
     assert scan["candidates"] == []
+
+
+def _bmo_reaction_bars():
+    """ขาขึ้น + แท่งล่าสุด (วันงบ) gap up 6% วอลุ่ม 4x — ลายเซ็นตอบรับงบ BMO"""
+    bars = _uptrend_prices()
+    prev_close = bars[1]["close"]
+    bars[0]["open"] = prev_close * 1.06
+    bars[0]["close"] = prev_close * 1.08
+    bars[0]["high"] = prev_close * 1.09
+    bars[0]["low"] = prev_close * 1.05
+    bars[0]["volume"] = 8_000_000
+    return bars
+
+
+def test_run_scan_takes_timing_from_secondary_for_fmp_symbol():
+    """ปฏิทิน FMP ไม่มี field time — timing ต้องถูกเติมจากแหล่งที่สอง
+    (เดิมตัวซ้ำโดน dedup ทิ้งทั้ง entry ทำให้ timing หายไปด้วย)"""
+    bars = _uptrend_prices()
+    earn_date = bars[0]["date"]  # งบวันเดียวกับ bar ล่าสุด
+    calendar = [{"symbol": "AAPL", "date": earn_date}]  # FMP: ไม่มี time
+    secondary = [{"symbol": "AAPL", "date": earn_date, "time": "bmo"}]
+    cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
+    scan = run_scan(cfg, lookback_days=3,
+                    client=FakeClient(calendar, {"AAPL": bars}),
+                    secondary_cal_fn=lambda f, t: secondary)
+    # bmo → D0 = วันงบเอง มีแท่งแล้ว ต้องไม่ค้าง waiting
+    assert scan["pending"] == []
+
+
+def test_run_scan_secondary_timing_joins_slash_symbol():
+    """สัญลักษณ์คนละ format (BRK.B vs BRK/B) ต้อง join timing กันเจอ"""
+    bars = _uptrend_prices()
+    earn_date = bars[0]["date"]
+    calendar = [{"symbol": "BRK.B", "date": earn_date}]
+    secondary = [{"symbol": "BRK/B", "date": earn_date, "time": "bmo"}]
+    cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
+    scan = run_scan(cfg, lookback_days=3,
+                    client=FakeClient(calendar, {"BRK.B": bars}),
+                    secondary_cal_fn=lambda f, t: secondary)
+    assert scan["pending"] == []
+
+
+def test_run_scan_infers_bmo_from_reaction_bar():
+    """timing unknown แต่แท่งวันงบ gap แรง+วอลุ่มพุ่ง → อนุมาน BMO ป้าย bmo*"""
+    bars = _bmo_reaction_bars()
+    calendar = [{"symbol": "AAPL", "date": bars[0]["date"]}]  # ไม่มี timing เลย
+    cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
+    scan = run_scan(cfg, lookback_days=3,
+                    client=FakeClient(calendar, {"AAPL": bars}))
+    assert scan["pending"] == []
+    assert len(scan["candidates"]) == 1
+    c = scan["candidates"][0]
+    assert c["timing"] == "bmo*"
+    assert c["levels"]["reaction_date"] == bars[0]["date"]
+
+
+def test_run_scan_explicit_amc_not_overridden_by_inference():
+    """แหล่งข้อมูลบอก amc ชัด — ต่อให้แท่งวันงบดู BMO แค่ไหนก็ห้ามเดาทับ"""
+    bars = _bmo_reaction_bars()
+    earn_date = bars[0]["date"]
+    calendar = [{"symbol": "AAPL", "date": earn_date}]
+    secondary = [{"symbol": "AAPL", "date": earn_date, "time": "amc"}]
+    cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
+    scan = run_scan(cfg, lookback_days=3,
+                    client=FakeClient(calendar, {"AAPL": bars}),
+                    secondary_cal_fn=lambda f, t: secondary)
+    assert [(p["symbol"], p["reason"]) for p in scan["pending"]] == \
+        [("AAPL", "waiting")]

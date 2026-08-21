@@ -14,7 +14,7 @@ from analyze_earnings_trades import analyze_stock, normalize_timing  # noqa: E40
 from fmp_client import ApiCallBudgetExceeded, FMPClient  # noqa: E402
 
 from bot import fetch_cache  # noqa: E402
-from bot.levels import compute_levels  # noqa: E402
+from bot.levels import compute_levels, infer_bmo  # noqa: E402
 
 UNIVERSE_CSV = PROJECT_ROOT / "us_stock_list.csv"
 REPORTS_DIR = PROJECT_ROOT / "reports"
@@ -61,14 +61,25 @@ def run_scan(config, lookback_days=None, client=None, secondary_cal_fn=None,
             calendar += secondary_cal_fn(from_date, to_date) or []
         except Exception:
             pass
-    seen, reported = set(), []
+    # FMP stable ไม่มี field time เลย — เก็บ timing จากทุก entry (รวมตัวที่แพ้
+    # dedup เช่น NASDAQ) ไว้เติมให้ตัวที่ยัง unknown; join แบบ normalize จุด/ทับ
+    def _canon(s):
+        return s.replace("/", ".").replace("-", ".")
+
+    seen, reported, timing_map = set(), [], {}
     for e in calendar:
         sym = e.get("symbol")
-        if sym and sym in universe and sym not in seen:
+        if not sym:
+            continue
+        t = normalize_timing(e.get("time"))
+        if t != "unknown":
+            timing_map.setdefault(_canon(sym), t)
+        if sym in universe and sym not in seen:
             seen.add(sym)
-            reported.append({"symbol": sym,
-                             "date": e.get("date"),
-                             "timing": normalize_timing(e.get("time"))})
+            reported.append({"symbol": sym, "date": e.get("date"), "timing": t})
+    for item in reported:
+        if item["timing"] == "unknown":
+            item["timing"] = timing_map.get(_canon(item["symbol"]), "unknown")
 
     candidates, skipped, pending = [], {"C": 0, "D": 0}, []
     for item in reported:
@@ -92,8 +103,12 @@ def run_scan(config, lookback_days=None, client=None, secondary_cal_fn=None,
             pending.append({**item,
                             "reason": "not_in_plan" if blocked else "no_data"})
             continue
-        analysis = analyze_stock(prices, item["date"], item["timing"])
-        levels = compute_levels(prices, item["date"], item["timing"])
+        timing = item["timing"]
+        if timing == "unknown" and infer_bmo(prices, item["date"]):
+            timing = "bmo"
+            item["timing"] = "bmo*"  # อนุมานจากแท่งราคา ไม่ใช่ปฏิทิน — ไว้ audit
+        analysis = analyze_stock(prices, item["date"], timing)
+        levels = compute_levels(prices, item["date"], timing)
         if levels is None:
             # วันตอบรับงบยังไม่มีในข้อมูล (งบวันนี้/เมื่อคืน) — รอสแกนรอบถัดไป
             pending.append({**item, "reason": "waiting"})

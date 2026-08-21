@@ -312,3 +312,35 @@ def test_format_lookup_pending_reaction():
 def test_format_lookup_no_dr_line_when_absent():
     text = format_lookup(make_snapshot(dr_symbols=""))
     assert "DR:" not in text
+
+
+def test_build_snapshot_infers_bmo_from_reaction_bar():
+    """FMP ไม่มี field time → timing unknown แต่แท่งวันงบ gap แรง+วอลุ่มพุ่ง
+    → อนุมาน BMO: ได้ levels ทันที (D0 = วันงบ) ป้าย bmo* ไม่ค้างรอ"""
+    prices = make_prices()
+    prev_close = prices[1]["close"]
+    prices[0]["open"] = prev_close * 0.93     # gap -7%
+    prices[0]["close"] = prev_close * 0.91
+    prices[0]["low"] = prev_close * 0.90
+    prices[0]["volume"] = 4_000_000
+    last_date = prices[0]["date"]
+    earnings = [{"date": last_date}]          # ไม่มี time (เหมือน stable API จริง)
+    snap = build_snapshot("WMT", prices, earnings=earnings,
+                          today=date.fromisoformat(last_date))
+    assert snap["timing"] == "bmo*"
+    assert snap["pending_reaction"] is False
+    assert snap["levels"] is not None
+    assert snap["levels"]["reaction_date"] == last_date
+    assert snap["reaction_pct"] is not None
+
+
+def test_build_snapshot_quiet_unknown_still_waits():
+    """timing unknown + แท่งวันงบเงียบ → ห้ามเดา ยังคงรอวันตอบรับตาม convention เดิม"""
+    prices = make_prices()
+    last_date = prices[0]["date"]
+    earnings = [{"date": last_date}]
+    snap = build_snapshot("AAPL", prices, earnings=earnings,
+                          today=date.fromisoformat(last_date))
+    assert snap["timing"] == "unknown"
+    assert snap["pending_reaction"] is True
+    assert snap["levels"] is None

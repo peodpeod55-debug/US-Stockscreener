@@ -73,6 +73,36 @@ def below_low_5d(levels):
     return price < low
 
 
+INFER_GAP_PCT = 3.0        # |gap เปิด| ขั้นต่ำ (%) เทียบปิดวันก่อน
+INFER_VOL_RATIO = 2.0      # วอลุ่มวันงบขั้นต่ำ เทียบเฉลี่ยก่อนวันงบ
+_INFER_MIN_VOL_BARS = 10   # ฐานวอลุ่มขั้นต่ำ — น้อยกว่านี้ค่าเฉลี่ยเชื่อไม่ได้
+
+
+def infer_bmo(daily_prices, earnings_date):
+    """เดาว่างบออกก่อนเปิดตลาด (BMO) จากพฤติกรรมแท่งวันงบเอง
+
+    ใช้เฉพาะเมื่อปฏิทินไม่บอก timing (FMP stable ไม่มี field time เลย):
+    แท่งวันงบ gap แรง "และ" วอลุ่มพุ่งพร้อมกัน = ตลาดตอบรับไปแล้วในวันงบ
+    ต้องเข้าทั้งสองเงื่อนไข (AND) กัน false positive จากวัน OpEx/ตลาดผันผวน
+    ห้ามใช้ทับ timing ที่มาจากแหล่งข้อมูลจริง
+    """
+    i = _find_index(daily_prices, earnings_date)
+    if i == -1 or i + 1 >= len(daily_prices):
+        return False
+    prev_close = daily_prices[i + 1]["close"]
+    if not prev_close:
+        return False
+    gap_pct = abs(daily_prices[i]["open"] - prev_close) / prev_close * 100
+    vols = [b["volume"] for b in daily_prices[i + 1: i + 21]]
+    if len(vols) < _INFER_MIN_VOL_BARS:
+        return False
+    avg = sum(vols) / len(vols)
+    if not avg:
+        return False
+    return gap_pct >= INFER_GAP_PCT and \
+        daily_prices[i]["volume"] / avg >= INFER_VOL_RATIO
+
+
 def compute_levels(daily_prices, earnings_date, timing):
     """คืน dict ระดับราคา หรือ None ถ้าหา reaction day (D0) ไม่ได้
 

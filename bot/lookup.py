@@ -16,7 +16,8 @@ from analyze_earnings_trades import analyze_stock, normalize_timing  # noqa: E40
 
 from bot import fetch_cache  # noqa: E402
 from bot.levels import (  # noqa: E402
-    compute_levels, detect_low_break, detect_new_breaks, detect_sl_break)
+    compute_levels, detect_low_break, detect_new_breaks, detect_sl_break,
+    infer_bmo)
 
 LOOKUP_MAX = 5                  # เพดานจำนวนหุ้นต่อหนึ่งข้อความ (คุมงบ API)
 RECENT_EARNINGS_DAYS = 60       # งบใหม่กว่านี้ (วันปฏิทิน) ถึงคำนวณสัญญาณหลังงบ
@@ -142,6 +143,10 @@ def build_snapshot(symbol, prices, meta=None, earnings=None, today=None):
         return snap
     # FMP อาจให้วันงบที่ไม่ใช่วันซื้อขาย → ใช้วันแท่งจริงกับ compute_levels
     earn_bar_date = prices[earn_idx]["date"]
+
+    if timing == "unknown" and infer_bmo(prices, earn_bar_date):
+        timing = "bmo"
+        snap["timing"] = "bmo*"  # อนุมานจากแท่งราคา ไม่ใช่ปฏิทิน
 
     d0 = earn_idx if timing == "bmo" else earn_idx - 1
     if d0 >= 0 and d0 + 1 < len(prices):
