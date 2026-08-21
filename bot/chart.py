@@ -18,11 +18,11 @@ CHART_BARS = 120                # ~6 เดือน เห็นฐาน 3M + 
 logger = logging.getLogger("bot.chart")
 
 _LEVEL_COLORS = (("high_5d", "#2e7d32"), ("high_3m", "#1565c0"),
-                 ("sl", "#c62828"))
+                 ("sl", "#c62828"), ("low_5d", "#ef6c00"))
 
 
 def build_chart_png(symbol, prices, levels=None, last_n=CHART_BARS):
-    """PNG กราฟแท่งเทียน + เส้นแนว (high_5d/high_3m/SL) + เส้นวันตอบรับงบ
+    """PNG กราฟแท่งเทียน + เส้นแนว (high_5d/high_3m/SL/low_5d) + เส้นวันตอบรับงบ
 
     prices: list[dict] most-recent-first (convention เดียวกับ levels.py)
     คืน None ถ้าแท่งไม่พอ

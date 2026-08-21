@@ -15,13 +15,16 @@ from bot.formatter import (
     format_breakouts,
     format_dr,
     format_lookup,
+    format_low_breaks,
     format_open_report,
     format_reminders,
     format_scan,
     format_sl_breaks,
     format_stats,
+    format_watch_detail,
     format_weekly,
 )
+from bot.levels import below_low_5d
 from bot.jobstate import PUSH_WEEKDAYS, already_ran, claim, due_catchup
 from bot.openbell import build_open_report, fetch_yahoo_quote, in_open_window
 from bot.lookup import LOOKUP_MAX, SymbolNotCovered, lookup_symbol, parse_tickers
@@ -138,10 +141,13 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Watchlist (สูงสุด {WATCHLIST_MAX} ตัว):\n"
         "ติดตาม NVDA — เพิ่มหุ้นเข้า watchlist\n"
         "เลิกติดตาม NVDA — เอาออก\n"
-        "ติดตาม — ดูรายชื่อที่ติดตามอยู่\n"
+        "ติดตาม — ดูรายชื่อ + แนวรายตัว\n"
+        "(H5d/H3m ทะลุหรือยัง, ระยะถึง SL, Low ก่อนงบ)\n"
         "บอทจะเตือนตอนเช้าเมื่อหุ้นที่ติดตาม\n"
         "มีงบวันนี้/พรุ่งนี้ (บอก BMO/AMC)\n"
-        f"หุ้นเกรด A/B จากสแกนเข้าเองอัตโนมัติ {AUTO_WATCH_DAYS} วัน\n\n"
+        f"หุ้นเกรด A/B จากสแกนเข้าเองอัตโนมัติ {AUTO_WATCH_DAYS} วัน\n"
+        "ปิดหลุด Low 5 วันก่อนงบ = setup จบ →\n"
+        "ตัวอัตโนมัติถูกเอาออกเอง (แจ้งให้ทราบ)\n\n"
         f"สรุป — ผลหุ้นที่บอทแจ้งย้อนหลัง {SIGNAL_LOOKBACK_DAYS} วัน\n"
         "(+/-% ตั้งแต่วันแจ้ง, เคยหลุด SL ไหม)\n"
         "สถิติ — ผลงานสะสมทุกสัญญาณ:\n"
@@ -151,7 +157,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Push อัตโนมัติ: อังคาร–เสาร์ 08:30 น.\n"
         "เตือนวันงบ: ทุกวัน 08:25 น.\n"
         "เตือนทะลุแนว (High 5วัน/3ด.ก่อนงบ)\n"
-        "และเตือนหลุด SL: อังคาร–เสาร์ 08:20 น.\n"
+        "เตือนหลุด SL/Low ก่อนงบ: อังคาร–เสาร์ 08:20 น.\n"
         "สรุปผลรายสัปดาห์: อาทิตย์ 09:00 น.\n"
         "ยืนยันเปิดตลาด US (หุ้นที่ติดตาม): ~30 นาทีหลังเปิด"
     )
@@ -165,15 +171,24 @@ async def _handle_watch_command(update, action, tickers):
             await update.message.reply_text(
                 "ยังไม่มีหุ้นใน watchlist — พิมพ์ เช่น: ติดตาม NVDA")
             return
-        lines = []
-        if manual:
-            lines.append(f"👀 ติดตามอยู่ {len(manual)} ตัว: {', '.join(manual)}")
-        if auto:
-            lines.append(f"🤖 อัตโนมัติจากสแกน A/B ({AUTO_WATCH_DAYS} วัน): "
-                         + ", ".join(f"{s} ({d})" for s, d in auto.items()))
-        lines.append("เตือนวันงบ 08:25 · เตือนทะลุแนว 08:20 · "
-                     "เอาออก: เลิกติดตาม <ticker>")
-        await update.message.reply_text("\n".join(lines))
+        symbols = manual + list(auto)
+        # แจ้งรอเฉพาะตอนต้องยิงเครือข่ายจริง — ช่วงเช้าหลัง job ราคาอยู่ใน cache ครบ
+        if any(fetch_cache.get(("prices", s, 250)) is None for s in symbols):
+            await update.message.reply_text(f"⏳ กำลังเช็คแนว {len(symbols)} ตัว...")
+        client = FMPClient(api_key=CONFIG.fmp_api_key,
+                           max_api_calls=3 * len(symbols) + 2)
+        universe = load_universe()
+        items = []
+        for sym in symbols:
+            try:
+                snap = await asyncio.to_thread(
+                    lookup_symbol, client, sym, universe,
+                    fallback_prices_fn=fetch_yahoo_prices)
+            except Exception:
+                logger.exception("watch detail %s failed", sym)
+                snap = None
+            items.append((sym, snap))
+        await update.message.reply_text(format_watch_detail(items, auto))
         return
     if action == "remove":
         if not tickers:
@@ -347,7 +362,8 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
         client = FMPClient(api_key=CONFIG.fmp_api_key,
                            max_api_calls=3 * len(symbols) + 2)
         universe = load_universe()
-        alerts, sl_alerts = [], []
+        auto = active_auto()
+        alerts, sl_alerts, low_alerts, dead = [], [], [], []
         for sym in symbols:
             try:
                 snap = await asyncio.to_thread(
@@ -360,11 +376,20 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
                 alerts.append(snap)
             if snap and snap.get("sl_break"):
                 sl_alerts.append(snap)
-        for msg in (format_breakouts(alerts), format_sl_breaks(sl_alerts)):
+            if snap and snap.get("low_break"):
+                low_alerts.append(snap)
+            # ปิดใต้ low ก่อนงบ = setup จบ → เก็บกวาดออกจาก auto-watch
+            # (state ไม่ใช่ edge — ตัวที่หลุดค้างมาหลายวันก็โดนเก็บ) manual ไม่แตะ
+            if snap and sym in auto and below_low_5d(snap.get("levels")):
+                dead.append(sym)
+        removed = auto_remove(dead) if dead else []
+        for msg in (format_breakouts(alerts), format_sl_breaks(sl_alerts),
+                    format_low_breaks(low_alerts, removed)):
             if msg:
                 await context.bot.send_message(chat_id=CONFIG.chat_id, text=msg)
         tagged = ([(s, "🚀 ทะลุแนว") for s in alerts]
-                  + [(s, "🛑 หลุด SL") for s in sl_alerts])
+                  + [(s, "🛑 หลุด SL") for s in sl_alerts]
+                  + [(s, "⛔ หลุด Low ก่อนงบ") for s in low_alerts])
         seen = set()
         for snap, tag in tagged[:CHART_MAX]:
             if snap["symbol"] in seen:      # ตัวเดียวทะลุแนว+หลุด SL วันเดียวกัน

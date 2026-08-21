@@ -1,4 +1,5 @@
 """จัดข้อความ Telegram (plain text ภาษาไทย)"""
+from bot.levels import below_low_5d
 from bot.stats import HORIZONS
 
 MAX_LEN = 3800
@@ -161,6 +162,94 @@ def format_sl_breaks(snaps):
         lines.append(f"🛑 ต่ำกว่า SL (low วันงบ): {s['levels']['sl']:,.2f}")
         if s.get("dr_symbols"):
             lines.append(f"🇹🇭 DR: {s['dr_symbols']}")
+    return "\n".join(lines)
+
+
+def _compact_level(label, value, pct):
+    """แนวต้านแบบย่อหนึ่งช่วง: "H5d 176.10 ✅" หรือ "H5d 190.00 (อีก 3.7%)" """
+    if value is None:
+        return f"{label} n/a"
+    if pct is None:
+        return f"{label} {value:,.2f}"
+    if pct >= 0:
+        return f"{label} {value:,.2f} ✅"
+    return f"{label} {value:,.2f} (อีก {abs(pct)}%)"
+
+
+def format_watch_detail(items, auto_dates=None):
+    """ตาราง levels ของหุ้นที่ติดตาม (พิมพ์ "ติดตาม") — items: [(symbol, snap|None)]
+
+    snap None = ดึงข้อมูลไม่ได้ · auto_dates: {symbol: วันเข้า} แยกกลุ่ม 🤖
+    ความยาว: เพดาน manual+auto 40 ตัว × 3 บรรทัดสั้น ยังไม่ชน MAX_LEN
+    """
+    if not items:
+        return None
+    auto_dates = auto_dates or {}
+
+    def block(sym, s):
+        if s is None:
+            return [f"⚠️ {sym} — ดึงข้อมูลไม่ได้"]
+        icon = GRADE_ICON.get(s.get("grade"), "⚪")
+        head = f"{icon} {sym} — {s['price']:,.2f} ({_signed(s['day_change_pct'])})"
+        if sym in auto_dates:
+            head += f" · เข้า {auto_dates[sym]}"
+        lv = s.get("levels")
+        if lv is None:
+            note = ("⏳ รอวันตอบรับงบ" if s.get("pending_reaction")
+                    else "ไม่มีงบใน 60 วัน — ไม่มีแนวให้เทียบ")
+            return [head, f"   {note}"]
+        lines = [head,
+                 "   " + _compact_level("H5d", lv["high_5d"], lv["pct_vs_high_5d"])
+                 + " · " + _compact_level("H3m", lv["high_3m"], lv["pct_vs_high_3m"])]
+        tail = []
+        if lv["sl"] is not None:
+            tail.append(f"SL {lv['sl']:,.2f} (-{lv['sl_pct']}%)")
+        if lv["low_5d"] is not None:
+            mark = "🛑 หลุดแล้ว" if below_low_5d(lv) else "✅"
+            tail.append(f"Low ก่อนงบ {lv['low_5d']:,.2f} {mark}")
+        if tail:
+            lines.append("   " + " · ".join(tail))
+        return lines
+
+    manual = [(s, snap) for s, snap in items if s not in auto_dates]
+    auto = [(s, snap) for s, snap in items if s in auto_dates]
+    lines = []
+    if manual:
+        lines.append(f"👀 ติดตามอยู่ {len(manual)} ตัว")
+        for sym, snap in manual:
+            lines += block(sym, snap)
+    if auto:
+        if lines:
+            lines.append("")
+        lines.append("🤖 อัตโนมัติจากสแกน A/B:")
+        for sym, snap in auto:
+            lines += block(sym, snap)
+    lines += ["", "เตือนวันงบ 08:25 · แนว/หลุดแนว 08:20 · "
+                  "เอาออก: เลิกติดตาม <ticker>"]
+    return "\n".join(lines)
+
+
+def format_low_breaks(snaps, removed=()):
+    """เตือนหลุด Low 5 วันก่อนงบ (คายการตอบรับงบทั้งก้อน = setup จบ)
+
+    removed: ตัวที่ถูกเอาออกจาก auto-watch เพราะปิดใต้แนวนี้ (รวมตัวที่หลุด
+    ค้างมาหลายวันโดยไม่มี edge วันนี้ — ห้ามหายเงียบ) · ว่างทั้งคู่ → None
+    """
+    if not snaps and not removed:
+        return None
+    lines = ["⛔ หลุด Low 5 วันก่อนงบ! (watchlist)"]
+    for s in snaps:
+        icon = GRADE_ICON.get(s.get("grade"), "⚪")
+        lines.append("")
+        lines.append(f"{icon} {s['symbol']} — {s['name']}")
+        lines.append(f"💰 ปิด {s['price']:,.2f} ({_signed(s['day_change_pct'])}) · "
+                     f"low {s['low']:,.2f}")
+        lines.append(f"⛔ ต่ำกว่า Low 5 วันก่อนงบ: {s['levels']['low_5d']:,.2f} "
+                     "— คายการตอบรับงบทั้งก้อนแล้ว")
+        if s.get("dr_symbols"):
+            lines.append(f"🇹🇭 DR: {s['dr_symbols']}")
+    if removed:
+        lines += ["", f"🗑 เลิกติดตามอัตโนมัติ (setup จบ): {', '.join(removed)}"]
     return "\n".join(lines)
 
 

@@ -45,6 +45,34 @@ def detect_sl_break(daily_prices, levels):
     return daily_prices[0]["low"] < sl <= daily_prices[1]["low"]
 
 
+def detect_low_break(daily_prices, levels):
+    """Low 5 วันก่อนงบที่ "เพิ่งหลุด" — หลุดแนวนี้ = คายการตอบรับงบทั้งก้อน setup จบ
+
+    self-dedup แบบเดียวกับ detect_sl_break (low ข้ามแนวลงเฉพาะวันแรก)
+    """
+    if not levels or not daily_prices or len(daily_prices) < 2:
+        return False
+    low = levels.get("low_5d")
+    if low is None:
+        return False
+    return daily_prices[0]["low"] < low <= daily_prices[1]["low"]
+
+
+def below_low_5d(levels):
+    """สถานะ "ปิดต่ำกว่า low 5 วันก่อนงบ" — ใช้ตัดสินเอาหุ้นออกจาก auto-watch
+
+    เทียบ close ตรงๆ (ไม่ใช่ pct ที่ปัดเศษ) และเป็น state ไม่ใช่ edge:
+    หุ้นที่หลุดไปแล้วหลายวัน (บอทไม่ได้เห็นวันข้าม) ก็ยังถูกเก็บกวาดออก
+    """
+    if not levels:
+        return False
+    low = levels.get("low_5d")
+    price = levels.get("price")
+    if low is None or price is None:
+        return False
+    return price < low
+
+
 def compute_levels(daily_prices, earnings_date, timing):
     """คืน dict ระดับราคา หรือ None ถ้าหา reaction day (D0) ไม่ได้
 
@@ -64,6 +92,7 @@ def compute_levels(daily_prices, earnings_date, timing):
 
     high_5d = max((b["high"] for b in pre[:5]), default=None)
     high_3m = max((b["high"] for b in pre[:63]), default=None)
+    low_5d = min((b["low"] for b in pre[:5]), default=None)
 
     # สัปดาห์ (จ–ศ) ที่จบล่าสุดก่อนสัปดาห์ของ bar ล่าสุด
     last_d = date.fromisoformat(daily_prices[0]["date"])
@@ -95,6 +124,8 @@ def compute_levels(daily_prices, earnings_date, timing):
         "pct_vs_high_5d": _pct_vs(price, high_5d),
         "high_3m": high_3m,
         "pct_vs_high_3m": _pct_vs(price, high_3m),
+        "low_5d": low_5d,
+        "pct_vs_low_5d": _pct_vs(price, low_5d),
         "prev_week_high": prev_week_high,
         "broke_prev_week_high": (price > prev_week_high) if prev_week_high else None,
         "new_high_count_10d": new_high_count,
