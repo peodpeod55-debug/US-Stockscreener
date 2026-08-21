@@ -2,12 +2,14 @@
 import asyncio
 import logging
 from datetime import datetime, time
+from logging.handlers import RotatingFileHandler
 from zoneinfo import ZoneInfo
 
 from telegram import Update
+from telegram.error import Conflict, NetworkError
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
-from bot import fetch_cache
+from bot import fetch_cache, instance_lock
 from bot.breakouts import record_breakouts
 from bot.chart import build_chart_png
 from bot.config import PROJECT_ROOT, load_config
@@ -52,14 +54,25 @@ from fmp_client import FMPClient  # sys.path ถูกตั้งโดย bot.
 
 TZ = ZoneInfo("Asia/Bangkok")
 
-logging.basicConfig(
-    filename=PROJECT_ROOT / "bot.log", level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s %(message)s",
-)
-# httpx log URL เต็มของ Telegram API ซึ่งมี bot token — ห้ามให้ลง log
-logging.getLogger("httpx").setLevel(logging.WARNING)
+LOG_PATH = PROJECT_ROOT / "bot.log"
+LOG_MAX_BYTES = 5_000_000       # เกินแล้วหมุนเป็น bot.log.1 … .N (เดิมโตไม่จำกัด)
+LOG_BACKUPS = 3
+
 logger = logging.getLogger("bot")
-CONFIG = load_config()
+CONFIG = None                   # ตั้งใน main() — import โมดูลนี้ได้โดยไม่มี .env (เทส/CI)
+
+
+def setup_logging(path=LOG_PATH):
+    """log ลงไฟล์แบบหมุน — คืน handler (เทสใช้ปิด/ตรวจค่า)"""
+    handler = RotatingFileHandler(path, maxBytes=LOG_MAX_BYTES,
+                                  backupCount=LOG_BACKUPS, encoding="utf-8")
+    logging.basicConfig(handlers=[handler], level=logging.INFO,
+                        format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    # httpx log URL เต็มของ Telegram API ซึ่งมี bot token — ห้ามให้ลง log
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    # apscheduler log ทุกรอบ job ที่ระดับ INFO — เสียงรบกวนหลักของไฟล์เดิม
+    logging.getLogger("apscheduler").setLevel(logging.WARNING)
+    return handler
 
 
 CHART_MAX = 6                   # เพดานรูปต่อหนึ่งรอบแจ้ง กันสแปม
@@ -532,11 +545,28 @@ async def catchup_job(context: ContextTypes.DEFAULT_TYPE):
         await jobs[name](context)
 
 
-def main():
-    app = Application.builder().token(CONFIG.telegram_token).build()
-    app.add_handler(CommandHandler(["start", "help"], cmd_help))
-    app.add_handler(CommandHandler("scan", cmd_scan))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
+async def on_error(update, context):
+    """error กลางของ PTB — เดิมไม่มี ทุก error ลง log เป็น "No error handlers are registered" """
+    err = context.error
+    if isinstance(err, Conflict):
+        # มีบอทอีก instance แย่ง getUpdates (instance_lock กันชั้นหนึ่งแล้ว แต่กันข้ามเครื่องไม่ได้)
+        logger.error("Conflict: bot อีก instance กำลังรันอยู่ — ปิดตัวที่ซ้ำ (%s)", err)
+    elif isinstance(err, NetworkError):
+        logger.warning("network hiccup (PTB retry เอง): %s", err)
+    else:
+        logger.error("unhandled error (update=%s)", update, exc_info=err)
+
+
+def build_app(config):
+    """ประกอบ Application: handlers + งานตั้งเวลา (แยกจาก main ให้เทสตรวจ wiring ได้)"""
+    app = Application.builder().token(config.telegram_token).build()
+    # รับเฉพาะข้อความใหม่ — ข้อความที่ถูก "แก้ไข" (edited) ผ่าน filters.TEXT ได้
+    # แต่ update.message เป็น None → handler เดิม AttributeError เงียบ
+    new_msg = filters.UpdateType.MESSAGE
+    app.add_handler(CommandHandler(["start", "help"], cmd_help, filters=new_msg))
+    app.add_handler(CommandHandler("scan", cmd_scan, filters=new_msg))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & new_msg, on_text))
+    app.add_error_handler(on_error)
     app.job_queue.run_daily(daily_job, time=time(8, 30, tzinfo=TZ))
     # เตือนวันงบรันทุกวัน (ไม่เว้นอาทิตย์/จันทร์ — งบวันจันทร์ต้องเตือนตั้งแต่อาทิตย์)
     app.job_queue.run_daily(reminder_job, time=time(8, 25, tzinfo=TZ))
@@ -549,6 +579,19 @@ def main():
     app.job_queue.run_daily(openbell_job, time=time(22, 0, tzinfo=TZ))
     # เปิดเครื่อง/restart หลังเวลา job เช้า → รันชดเชยรอบที่พลาด (กันซ้ำด้วย claim)
     app.job_queue.run_once(catchup_job, when=15)
+    return app
+
+
+def main():
+    setup_logging()
+    lock = instance_lock.acquire()  # ถือ reference ไว้ตลอดอายุ process
+    if lock is None:
+        logger.error("bot.main รันอยู่แล้วอีก instance (port %d ถูกถือ) — จบตัวนี้",
+                     instance_lock.LOCK_PORT)
+        raise SystemExit("bot.main กำลังรันอยู่แล้ว — กัน getUpdates Conflict")
+    global CONFIG
+    CONFIG = load_config()
+    app = build_app(CONFIG)
     logger.info("bot starting")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
