@@ -7,6 +7,7 @@ import json
 from datetime import date, timedelta
 
 from bot.config import PROJECT_ROOT
+from bot.fileio import write_json_atomic
 
 SIGNALS_PATH = PROJECT_ROOT / "signals.json"
 
@@ -44,8 +45,7 @@ def record_signals(candidates, flag_date, path=SIGNALS_PATH):
             "dr_symbols": c.get("dr_symbols") or "",
         })
     if new:
-        path.write_text(json.dumps(signals + new, ensure_ascii=False, indent=2),
-                        encoding="utf-8")
+        write_json_atomic(path, signals + new)
     return new
 
 

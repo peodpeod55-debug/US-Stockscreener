@@ -7,6 +7,7 @@ import json
 from datetime import date, timedelta
 
 from bot.config import PROJECT_ROOT
+from bot.fileio import write_json_atomic
 from bot.lookup import parse_tickers
 
 WATCHLIST_PATH = PROJECT_ROOT / "watchlist.json"
@@ -44,8 +45,7 @@ def load_watchlist(path=WATCHLIST_PATH):
 
 
 def save_watchlist(symbols, path=WATCHLIST_PATH):
-    path.write_text(json.dumps(symbols, ensure_ascii=False, indent=2),
-                    encoding="utf-8")
+    write_json_atomic(path, symbols)
 
 
 def add_symbols(symbols, path=WATCHLIST_PATH):
@@ -92,8 +92,7 @@ def load_auto_watch(path=AUTO_WATCH_PATH):
 
 
 def save_auto_watch(data, path=AUTO_WATCH_PATH):
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2),
-                    encoding="utf-8")
+    write_json_atomic(path, data)
 
 
 def active_auto(path=AUTO_WATCH_PATH, today=None):

@@ -7,6 +7,7 @@
 import json
 
 from bot.config import PROJECT_ROOT
+from bot.fileio import write_json_atomic
 
 BREAKOUTS_PATH = PROJECT_ROOT / "breakouts.json"
 
@@ -38,6 +39,5 @@ def record_breakouts(snaps, path=BREAKOUTS_PATH):
             "grade": s.get("grade"),
         })
     if new:
-        path.write_text(json.dumps(events + new, ensure_ascii=False, indent=2),
-                        encoding="utf-8")
+        write_json_atomic(path, events + new)
     return new

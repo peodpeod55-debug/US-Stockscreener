@@ -7,6 +7,7 @@ import json
 from datetime import date, time
 
 from bot.config import PROJECT_ROOT
+from bot.fileio import write_json_atomic
 
 JOB_STATE_PATH = PROJECT_ROOT / "job_state.json"
 
@@ -42,8 +43,7 @@ def claim(job, path=JOB_STATE_PATH, today=None):
     if data.get(job) == today.isoformat():
         return False
     data[job] = today.isoformat()
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2),
-                    encoding="utf-8")
+    write_json_atomic(path, data)
     return True
 
 
@@ -57,8 +57,7 @@ def release(job, path=JOB_STATE_PATH, today=None):
     if data.get(job) != today.isoformat():
         return False
     del data[job]
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2),
-                    encoding="utf-8")
+    write_json_atomic(path, data)
     return True
 
 
