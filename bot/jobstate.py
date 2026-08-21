@@ -47,6 +47,21 @@ def claim(job, path=JOB_STATE_PATH, today=None):
     return True
 
 
+def release(job, path=JOB_STATE_PATH, today=None):
+    """คืนสิทธิ์ที่ claim วันนี้ (job ล้มก่อนสำเร็จ) — catch-up รอบถัดไปได้รันใหม่
+
+    ลบเฉพาะเมื่อค่าเป็นวันนี้ — claim ของวันอื่นไม่ใช่ของเรา ห้ามแตะ
+    """
+    today = today or date.today()
+    data = _load(path)
+    if data.get(job) != today.isoformat():
+        return False
+    del data[job]
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2),
+                    encoding="utf-8")
+    return True
+
+
 def due_catchup(now):
     """job ที่ถึงเวลาแล้ววันนี้ (ตามวัน+เวลาใน SCHEDULE) — ตัวกรองซ้ำอยู่ที่ claim"""
     return [name for name, t, days in SCHEDULE

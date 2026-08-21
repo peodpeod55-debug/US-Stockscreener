@@ -1,7 +1,7 @@
 """Telegram bot entry: /scan /help + daily push อังคาร–เสาร์ 08:30 Asia/Bangkok"""
 import asyncio
 import logging
-from datetime import datetime, time
+from datetime import date, datetime, time
 from logging.handlers import RotatingFileHandler
 from zoneinfo import ZoneInfo
 
@@ -28,7 +28,7 @@ from bot.formatter import (
     format_weekly,
 )
 from bot.levels import below_low_5d
-from bot.jobstate import PUSH_WEEKDAYS, already_ran, claim, due_catchup
+from bot.jobstate import PUSH_WEEKDAYS, already_ran, claim, due_catchup, release
 from bot.openbell import build_open_report, fetch_yahoo_quote, in_open_window
 from bot.lookup import LOOKUP_MAX, SymbolNotCovered, lookup_symbol, parse_tickers
 from bot.nasdaq_cal import fetch_nasdaq_earnings
@@ -339,14 +339,47 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                           caption=f"{sym} — ปิด {snap['price']:,.2f}")
 
 
-async def reminder_job(context: ContextTypes.DEFAULT_TYPE):
-    """เช้าทุกวัน: เช็คหุ้นที่ติดตาม (manual + auto) ตัวไหนงบวันนี้/พรุ่งนี้"""
-    if not claim("reminder"):
-        return
-    symbols = all_watched()
-    if not symbols:
+JOB_MAX_TRIES = 3               # เพดานลอง/วัน ต่อ job (นับใน process) กันสแปม+เผางบ API
+CATCHUP_INTERVAL = 30 * 60      # วินาที — catch-up วนเก็บ job ที่พลาด/ล้มทุกครึ่งชั่วโมง
+
+_fail_counts = {}               # (job, วัน ISO) -> จำนวนครั้งที่ล้มวันนี้
+
+
+async def _run_claimed(context, name, work):
+    """claim วันนี้ → ทำงาน · ล้ม → คืน claim + แจ้งผู้ใช้ ให้ catch-up รอบถัดไปลองใหม่
+
+    เดิม claim ค้างแม้ job ล้ม — เน็ตสะดุดตอนเช้า = job หายทั้งวันเงียบๆ
+    ล้มครบ JOB_MAX_TRIES → เก็บ claim ไว้ (เลิกลองวันนี้) · retry อาจส่งข้อความ
+    ที่ออกไปแล้วซ้ำถ้าล้มกลางคัน — ยอมรับ ดีกว่าพลาดเตือน SL/แนวทั้งวัน
+    process crash (ไม่ใช่ exception) claim ค้างเหมือนเดิม — แยกไม่ได้ว่าส่งไปแค่ไหน
+    """
+    if not claim(name):
         return
     try:
+        await work()
+    except Exception as e:
+        logger.exception("%s job failed", name)
+        key = (name, date.today().isoformat())
+        _fail_counts[key] = tries = _fail_counts.get(key, 0) + 1
+        if tries < JOB_MAX_TRIES:
+            release(name)
+            note = (f"⚠️ job {name} ล้มเหลว: {e}\nจะลองใหม่อัตโนมัติภายใน "
+                    f"~{CATCHUP_INTERVAL // 60} นาที (ครั้งที่ {tries}/{JOB_MAX_TRIES})")
+        else:
+            note = (f"⚠️ job {name} ล้มเหลวครบ {JOB_MAX_TRIES} ครั้ง — "
+                    "หยุดลองสำหรับวันนี้ (ดู bot.log)")
+        try:
+            await context.bot.send_message(chat_id=CONFIG.chat_id, text=note)
+        except Exception:
+            logger.exception("%s failure notify failed", name)
+
+
+async def reminder_job(context: ContextTypes.DEFAULT_TYPE):
+    """เช้าทุกวัน: เช็คหุ้นที่ติดตาม (manual + auto) ตัวไหนงบวันนี้/พรุ่งนี้"""
+    async def work():
+        symbols = all_watched()
+        if not symbols:
+            return
         client = FMPClient(api_key=CONFIG.fmp_api_key,
                            max_api_calls=len(symbols) + 2)
 
@@ -359,20 +392,19 @@ async def reminder_job(context: ContextTypes.DEFAULT_TYPE):
         msg = format_reminders(items)
         if msg:
             await context.bot.send_message(chat_id=CONFIG.chat_id, text=msg)
-    except Exception:
-        logger.exception("reminder job failed")
+
+    await _run_claimed(context, "reminder", work)
 
 
 async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
     """เช้าอังคาร–เสาร์ (หลังได้ EOD คืนก่อน): หุ้นที่ติดตามตัวไหนเพิ่งทะลุแนว/หลุด SL"""
     if datetime.now(TZ).weekday() not in PUSH_WEEKDAYS:
         return
-    if not claim("breakout"):
-        return
-    symbols = all_watched()
-    if not symbols:
-        return
-    try:
+
+    async def work():
+        symbols = all_watched()
+        if not symbols:
+            return
         client = FMPClient(api_key=CONFIG.fmp_api_key,
                            max_api_calls=3 * len(symbols) + 2)
         universe = load_universe()
@@ -415,8 +447,8 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
                               snap.get("levels"),
                               caption=f"{tag} {snap['symbol']} — "
                                       f"ปิด {snap['price']:,.2f}")
-    except Exception:
-        logger.exception("breakout job failed")
+
+    await _run_claimed(context, "breakout", work)
 
 
 async def openbell_job(context: ContextTypes.DEFAULT_TYPE):
@@ -505,36 +537,25 @@ async def weekly_job(context: ContextTypes.DEFAULT_TYPE):
     """อาทิตย์เช้า: สรุปว่าหุ้นที่บอทเคยแจ้ง ตอนนี้เป็นยังไงบ้าง"""
     if datetime.now(TZ).weekday() != 6:  # อาทิตย์
         return
-    if not claim("weekly"):
-        return
-    try:
-        await _send_weekly(context.bot, CONFIG.chat_id)
-    except Exception:
-        logger.exception("weekly job failed")
+    await _run_claimed(context, "weekly",
+                       lambda: _send_weekly(context.bot, CONFIG.chat_id))
 
 
 async def daily_job(context: ContextTypes.DEFAULT_TYPE):
     # job ตั้งรันทุกวัน แล้วเช็ควันในนี้เอง (กันความกำกวมเรื่อง days ของ JobQueue)
     if datetime.now(TZ).weekday() not in PUSH_WEEKDAYS:
         return
-    if not claim("scan"):
-        return
-    try:
-        await _do_scan_and_send(context.bot, CONFIG.chat_id, CONFIG.lookback_days)
-    except Exception as e:
-        logger.exception("daily job failed")
-        try:
-            await context.bot.send_message(
-                chat_id=CONFIG.chat_id, text=f"⚠️ Daily scan ล้มเหลว: {e}")
-        except Exception:
-            logger.exception("error notify failed")
+    await _run_claimed(context, "scan",
+                       lambda: _do_scan_and_send(context.bot, CONFIG.chat_id,
+                                                 CONFIG.lookback_days))
 
 
 async def catchup_job(context: ContextTypes.DEFAULT_TYPE):
-    """หลังบอท start: รัน job เช้าที่เวลาผ่านแล้วแต่วันนี้ยังไม่ได้รัน
+    """วนทุก CATCHUP_INTERVAL: รัน job เช้าที่เวลาผ่านแล้วแต่วันนี้ยังไม่สำเร็จ
 
-    เครื่องปิด/หลับช่วง 08:20–09:00 → เปิดเครื่องปุ๊บได้ผลชดเชยทันที
-    claim ในแต่ละ job กันส่งซ้ำกรณี restart ระหว่างวัน
+    เก็บทั้ง (1) รอบที่พลาดเพราะเครื่องปิด/หลับช่วงเช้า — รอบแรกยิง 15 วิหลัง
+    start (2) job ที่ล้มแล้วถูกคืน claim โดย _run_claimed — retry ในรอบถัดไป
+    claim ในแต่ละ job กันส่งซ้ำ ทำให้วนถี่แค่ไหนก็ไม่รันเกินวันละครั้ง
     """
     jobs = {"breakout": breakout_job, "reminder": reminder_job,
             "scan": daily_job, "weekly": weekly_job}
@@ -577,8 +598,9 @@ def build_app(config):
     # ยืนยันเปิดตลาด US: ยิงสองรอบ in_open_window เลือกรอบที่ห่างเปิด 20-80 นาที
     app.job_queue.run_daily(openbell_job, time=time(21, 0, tzinfo=TZ))
     app.job_queue.run_daily(openbell_job, time=time(22, 0, tzinfo=TZ))
-    # เปิดเครื่อง/restart หลังเวลา job เช้า → รันชดเชยรอบที่พลาด (กันซ้ำด้วย claim)
-    app.job_queue.run_once(catchup_job, when=15)
+    # catch-up วนซ้ำ: รอบแรกเก็บ job ที่พลาดตอนเครื่องปิด/หลับ รอบถัดๆ ไป
+    # retry job ที่ล้มแล้วถูกคืน claim (_run_claimed) — กันซ้ำด้วย claim
+    app.job_queue.run_repeating(catchup_job, interval=CATCHUP_INTERVAL, first=15)
     return app
 
 
