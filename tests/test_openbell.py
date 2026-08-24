@@ -97,6 +97,23 @@ def test_fetch_yahoo_quote_parses_chart_meta():
     assert q == {"price": 105.5, "open": 102.0, "previousClose": 100.0}
 
 
+def test_fetch_yahoo_quote_raw_keeps_symbol():
+    urls = []
+
+    def fake_get(url, params=None, headers=None, timeout=None):
+        urls.append(url)
+        return FakeResp({"chart": {"result": [{
+            "meta": {"regularMarketPrice": 35.75, "chartPreviousClose": 35.0},
+            "indicators": {"quote": [{"open": [35.25]}]},
+        }]}})
+
+    q = fetch_yahoo_quote("NVDA80.BK", get=fake_get, raw=True)
+    assert q["price"] == 35.75
+    assert urls[0].endswith("NVDA80.BK")    # raw: ไม่แปลงจุดเป็นขีด
+    fetch_yahoo_quote("BRK.B", get=fake_get)
+    assert urls[1].endswith("BRK-B")        # default: แปลงเหมือนเดิม
+
+
 def test_fetch_yahoo_quote_failure_returns_none():
     assert fetch_yahoo_quote("NVDA", get=lambda *a, **k: FakeResp({}, 500)) is None
     assert fetch_yahoo_quote(

@@ -1,4 +1,6 @@
 """จัดข้อความ Telegram (plain text ภาษาไทย)"""
+from datetime import date, timedelta
+
 from bot.levels import below_low_5d
 from bot.stats import HORIZONS
 
@@ -307,15 +309,23 @@ def format_dr(symbol, name, items, hidden=0):
     lines = [f"🇹🇭 DR Premium — {name} ({symbol})"]
     first = next((p for _, p in items if p), None)
     if first:
+        fx_tag = " สด" if first.get("fx_live") else ""
         lines.append(f"หุ้นแม่ ${first['us_price']:,.2f} ({first['us_date']}) · "
-                     f"USDTHB {first['fx']:.2f}")
+                     f"USDTHB {first['fx']:.2f}{fx_tag}")
     for dr_sym, p in items:
         lines.append("")
         if p is None:
             lines.append(f"{dr_sym}: ข้อมูลไม่พอ (DR ใหม่/ซื้อขายเบาบาง "
                          "หรือดึงราคาไม่ได้)")
             continue
-        lines.append(f"{dr_sym}: ฿{p['dr_price']:,.2f} ({p['dr_date']}) · "
+        # live = ราคาจาก quote สด (ไม่ใช่แท่ง EOD) — โชว์ %วันนี้แทนวันที่แท่ง
+        if p.get("live"):
+            when = "สด"
+            if p.get("day_pct") is not None:
+                when += f" · วันนี้ {_signed(p['day_pct'])}"
+        else:
+            when = p["dr_date"]
+        lines.append(f"{dr_sym}: ฿{p['dr_price']:,.2f} ({when}) · "
                      f"วอลุ่ม {_fmt_volume(p['volume'])}")
         pct = p["premium_pct"]
         if pct > DR_PREMIUM_TH:
@@ -374,6 +384,58 @@ def format_reminders(items):
             line += f" {label}"
         lines.append(line)
     return "\n".join(lines)
+
+
+_CAL_TIMING_LABEL = {"bmo": "🌅 ก่อนเปิดตลาด US",
+                     "amc": "🌙 หลังปิดตลาด US",
+                     "unknown": "❔ ไม่ระบุเวลา"}
+_CAL_ROW = 10                   # จำนวน ticker ต่อบรรทัด — คุมความยาวบรรทัด/ข้อความ
+
+
+def format_calendar(items, from_date, to_date, days_ahead, watchlist=()):
+    """ปฏิทินงบจาก build_calendar — คืน list ข้อความ (แบ่งตาม MAX_LEN)
+
+    แสดงทุกวันในช่วงแม้ไม่มีหุ้นออกงบ (คำถามคือ "วันนี้มีไหม" — ตอบ "ไม่มี" ชัดๆ)
+    """
+    watch = set(watchlist)
+    header = (f"📅 ปฏิทินงบ universe (DR ∪ S&P500)\n"
+              f"{from_date} → {to_date}")
+    by_date = {}
+    for it in items:
+        by_date.setdefault(it["date"], []).append(it)
+    day_blocks = []
+    d0 = date.fromisoformat(from_date)
+    for n in range(days_ahead + 1):
+        ds = (d0 + timedelta(days=n)).isoformat()
+        label = _DAYS_TH.get(n, f"อีก {n} วัน")
+        todays = by_date.get(ds, [])
+        if not todays:
+            day_blocks.append(f"▸ {label} ({ds}) — ไม่มี")
+            continue
+        lines = [f"▸ {label} ({ds}) — {len(todays)} ตัว"]
+        for timing in ("bmo", "amc", "unknown"):
+            tags = [it["symbol"] + ("🇹🇭" if it["dr_symbols"] else "")
+                    + ("📌" if it["symbol"] in watch else "")
+                    for it in todays if it["timing"] == timing]
+            for i in range(0, len(tags), _CAL_ROW):
+                prefix = f"{_CAL_TIMING_LABEL[timing]}: " if i == 0 else "   "
+                lines.append(prefix + ", ".join(tags[i:i + _CAL_ROW]))
+        day_blocks.append("\n".join(lines))
+    footer = "🇹🇭 = มี DR ไทย · 📌 = ใน watchlist · ดูรายตัว: พิมพ์ ticker"
+    sep = "\n\n"
+    messages, current = [], header
+    for block in day_blocks:
+        if len(current) + len(sep) + len(block) > MAX_LEN:
+            messages.append(current)
+            current = block
+        else:
+            current += sep + block
+    if len(current) + len(sep) + len(footer) <= MAX_LEN:
+        messages.append(current + sep + footer)
+    else:
+        messages.append(current)
+        messages.append(footer)
+    return messages
 
 
 def format_scan(scan):

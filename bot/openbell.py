@@ -57,9 +57,12 @@ def build_open_report(symbols, get_quote):
     return items
 
 
-def fetch_yahoo_quote(symbol, get=requests.get):
-    """quote สำรองจาก Yahoo v8 (range 1d) — คืนรูปเดียวกับ FMP หรือ None"""
-    ysym = symbol.upper().replace(".", "-")
+def fetch_yahoo_quote(symbol, get=requests.get, raw=False):
+    """quote สำรองจาก Yahoo v8 (range 1d) — คืนรูปเดียวกับ FMP หรือ None
+
+    raw=True: ใช้สัญลักษณ์ตามที่ให้มา (DR ไทย .BK / FX =X) — ไม่แปลงจุดเป็นขีด
+    """
+    ysym = symbol.upper() if raw else symbol.upper().replace(".", "-")
     try:
         resp = get(YAHOO_URL.format(symbol=ysym),
                    params={"range": "1d", "interval": "1d"},

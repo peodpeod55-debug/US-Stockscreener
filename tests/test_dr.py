@@ -106,6 +106,41 @@ def test_premium_none_when_not_enough_pairs():
     assert compute_premium([], [], []) is None
 
 
+def test_premium_eod_has_no_live_fields_set():
+    dr, us, fx = _fixture()
+    p = compute_premium(dr, us, fx)
+    assert p["live"] is False and p["fx_live"] is False
+    assert p["day_pct"] is None
+
+
+def test_premium_uses_live_quote_over_last_close():
+    dr, us, fx = _fixture()                       # ratio EOD คงที่ทุกวัน
+    p = compute_premium(dr, us, fx,
+                        dr_quote={"price": 3.2 * 1.02, "previousClose": 3.2})
+    assert round(p["premium_pct"], 2) == 2.0      # premium มาจากราคาสด
+    assert round(p["dr_price"], 6) == 3.264
+    assert p["live"] is True
+    assert round(p["day_pct"], 2) == 2.0
+
+
+def test_premium_live_fx_quote_overrides_daily_fx():
+    dr, us, fx = _fixture()
+    p = compute_premium(dr, us, fx, fx_quote={"price": 32.0 * 1.01})
+    assert p["fx_live"] is True and p["live"] is False
+    assert round(p["fx"], 4) == round(32.0 * 1.01, 4)
+    # DR ราคาเดิมแต่ FX แพงขึ้น 1% → DR ดูถูกลง ~1%
+    assert round(p["premium_pct"], 1) == -1.0
+
+
+def test_premium_quote_without_price_falls_back_to_eod():
+    dr, us, fx = _fixture()
+    p = compute_premium(dr, us, fx, dr_quote={"price": None},
+                        fx_quote={"price": None})
+    assert p["live"] is False and p["fx_live"] is False
+    assert p["day_pct"] is None
+    assert round(p["premium_pct"], 4) == 0.0
+
+
 # ── format_dr ────────────────────────────────────────────────────
 
 def _prem(**over):
@@ -135,6 +170,20 @@ def test_format_dr_discount_and_normal():
 def test_format_dr_handles_missing_data():
     msg = format_dr("NVDA", "NVIDIA", [("NVDA80", None)])
     assert "NVDA80" in msg and "ข้อมูลไม่พอ" in msg
+
+
+def test_format_dr_live_shows_intraday_change():
+    msg = format_dr("NVDA", "NVIDIA",
+                    [("NVDA80", _prem(live=True, day_pct=1.23, fx_live=True))])
+    assert "(สด · วันนี้ +1.2%)" in msg
+    assert "2026-08-20" not in msg          # ไม่โชว์วันที่แท่งเมื่อใช้ราคาสด
+    assert "USDTHB 32.83 สด" in msg
+
+
+def test_format_dr_eod_dict_keeps_date_label():
+    # dict เก่า (ไม่มี key live/day_pct) ต้องยังใช้ได้ — backward compat
+    msg = format_dr("NVDA", "NVIDIA", [("NVDA80", _prem())])
+    assert "(2026-08-20)" in msg and "สด" not in msg
 
 
 def test_format_dr_notes_hidden_symbols():

@@ -55,11 +55,16 @@ def pair_ratios(dr_prices, us_prices, fx_prices):
     return ratios
 
 
-def compute_premium(dr_prices, us_prices, fx_prices):
+def compute_premium(dr_prices, us_prices, fx_prices, dr_quote=None,
+                    fx_quote=None):
     """premium ของ DR ล่าสุดเทียบ ratio ปกติ — None ถ้าคู่ข้อมูลไม่พอ
 
+    dr_quote/fx_quote: quote สด (dict price/previousClose) — มีแล้วใช้แทน
+    close แท่งล่าสุด → premium สะท้อนราคาปัจจุบัน (baseline ยังจากรายวันเดิม)
     คืน dict: dr_price, dr_date, volume, us_price, us_date, fx,
-    baseline (median ratio ไม่รวมวันล่าสุด), fair (us×fx×baseline), premium_pct
+    baseline (median ratio ไม่รวมวันล่าสุด), fair (us×fx×baseline),
+    premium_pct, live (ใช้ quote สดไหม), day_pct (%วันนี้ — เฉพาะ live),
+    fx_live (FX จาก quote สดไหม)
     """
     if not dr_prices:
         return None
@@ -73,15 +78,30 @@ def compute_premium(dr_prices, us_prices, fx_prices):
     last = dr_prices[0]
     us = _latest_before(us_prices, last["date"])
     fx = _latest_before(fx_prices, last["date"], inclusive=True)
-    fair = us["close"] * fx["close"] * baseline
+    if us is None or fx is None:      # แท่ง DR ล่าสุดจับคู่ไม่ได้ (ข้อมูลขาดช่วง)
+        return None
+    dr_live = (dr_quote or {}).get("price")
+    fx_live = (fx_quote or {}).get("price")
+    dr_price = dr_live if dr_live is not None else last["close"]
+    fx_val = fx_live if fx_live is not None else fx["close"]
+    base = us["close"] * fx_val
+    if not base:
+        return None
+    day_pct = None
+    prev = (dr_quote or {}).get("previousClose")
+    if dr_live is not None and prev:
+        day_pct = (dr_live - prev) / prev * 100
     return {
-        "dr_price": last["close"],
+        "dr_price": dr_price,
         "dr_date": last["date"],
         "volume": last.get("volume"),
         "us_price": us["close"],
         "us_date": us["date"],
-        "fx": fx["close"],
+        "fx": fx_val,
         "baseline": baseline,
-        "fair": fair,
-        "premium_pct": (ratios[-1] / baseline - 1) * 100,
+        "fair": base * baseline,
+        "premium_pct": (dr_price / base / baseline - 1) * 100,
+        "live": dr_live is not None,
+        "day_pct": day_pct,
+        "fx_live": fx_live is not None,
     }

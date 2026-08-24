@@ -26,11 +26,13 @@ from bot.buttons import (
     mark_pressed,
     parse_callback,
 )
+from bot.calendar_preview import build_calendar, parse_calendar_command
 from bot.chart import build_chart_png
 from bot.config import PROJECT_ROOT, load_config
 from bot.dr import DR_MAX, compute_premium, parse_dr_command, parse_dr_symbols
 from bot.formatter import (
     format_breakouts,
+    format_calendar,
     format_dr,
     format_lookup,
     format_low_breaks,
@@ -195,7 +197,11 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "สถิติ — ผลงานสะสมทุกสัญญาณ:\n"
         "win rate แยกเกรด, drift +5/+20/+60 วัน, อัตราหลุด SL\n\n"
         "dr NVDA — DR ไทยแพง/ถูกกว่าปกติแค่ไหน\n"
-        "(premium เทียบหุ้นแม่ × USDTHB, ทุก DR ของหุ้นนั้น)\n\n"
+        "(ราคา DR/USDTHB สดจาก quote · premium เทียบ\n"
+        "หุ้นแม่ × USDTHB, ทุก DR ของหุ้นนั้น)\n\n"
+        "งบ — ปฏิทินงบ universe วันนี้ + 2 วันข้างหน้า\n"
+        "งบ 5 — ล่วงหน้า 5 วัน (สูงสุด 7) · งบวันนี้ — เฉพาะวันนี้\n"
+        "(บอก BMO/AMC, 🇹🇭 มี DR, 📌 อยู่ใน watchlist)\n\n"
         "Push อัตโนมัติ: อังคาร–เสาร์ 08:30 น.\n"
         "เตือนวันงบ: ทุกวัน 08:25 น.\n"
         "เตือนทะลุแนว (High 5วัน/3ด.ก่อนงบ)\n"
@@ -263,7 +269,9 @@ async def _handle_watch_command(update, action, tickers):
 def _build_dr_report(sym, meta, drs):
     """รายงาน DR premium ของหุ้นแม่หนึ่งตัว (blocking — เรียกใน to_thread)
 
-    ทุก fetch ผ่าน Yahoo (ฟรี ไม่กินงบ FMP) + fetch_cache 60 นาที
+    ทุก fetch ผ่าน Yahoo (ฟรี ไม่กินงบ FMP) — แท่งรายวัน (baseline) cache 60
+    นาที ส่วนราคาปัจจุบัน DR/FX ใช้ quote สดไม่ cache (quote เก่าไม่มีประโยชน์)
+    quote ล้ม → compute_premium ถอยไปใช้ close แท่งล่าสุดแบบเดิมเอง
     """
     fx = fetch_cache.cached(
         ("fx", "USDTHB"),
@@ -272,13 +280,38 @@ def _build_dr_report(sym, meta, drs):
     if us is None:
         us = fetch_yahoo_prices(sym, 250)
         fetch_cache.put(("prices", sym, 250), us)
+    fx_quote = fetch_yahoo_quote("USDTHB=X", raw=True)
     items = []
     for d in drs[:DR_MAX]:
         dr_prices = fetch_cache.cached(
             ("dr", d), lambda d=d: fetch_yahoo_prices(f"{d}.BK", 120, raw=True))
-        items.append((d, compute_premium(dr_prices, us, fx)))
+        dr_quote = fetch_yahoo_quote(f"{d}.BK", raw=True)
+        items.append((d, compute_premium(dr_prices, us, fx,
+                                         dr_quote=dr_quote, fx_quote=fx_quote)))
     return format_dr(sym, meta["name"], items,
                      hidden=max(0, len(drs) - DR_MAX))
+
+
+async def _handle_calendar(update, days_ahead):
+    """ปฏิทินงบล่วงหน้า (พิมพ์ "งบ") — FMP 1 call + NASDAQ เสริม, cache 60 นาที"""
+    client = FMPClient(api_key=CONFIG.fmp_api_key, max_api_calls=4)
+
+    def get_calendar(from_date, to_date):
+        return fetch_cache.cached(
+            ("calendar", from_date, to_date),
+            lambda: client.get_earnings_calendar(from_date, to_date))
+
+    def secondary(from_date, to_date):
+        return fetch_cache.cached(
+            ("nasdaq_cal", from_date, to_date),
+            lambda: fetch_nasdaq_earnings(from_date, to_date))
+
+    items, from_date, to_date = await asyncio.to_thread(
+        build_calendar, get_calendar, load_universe(),
+        days_ahead=days_ahead, secondary_cal_fn=secondary)
+    for msg in format_calendar(items, from_date, to_date, days_ahead,
+                               watchlist=all_watched()):
+        await update.message.reply_text(msg)
 
 
 async def _handle_dr(update, tickers):
@@ -321,6 +354,15 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             logger.exception("stats failed")
             await update.message.reply_text("⚠️ สถิติล้มเหลว ดู bot.log")
+        return
+    cal_cmd = parse_calendar_command(update.message.text)
+    if cal_cmd is not None:
+        try:
+            await _handle_calendar(update, cal_cmd)
+        except Exception:
+            logger.exception("calendar failed")
+            await update.message.reply_text(
+                "⚠️ ดึงปฏิทินงบล้มเหลว ลองใหม่อีกครั้งนะครับ")
         return
     # เช็คก่อน lookup — "DR" เองก็เข้ารูป ticker จะโดนตีความผิดเป็นหุ้น
     dr_cmd = parse_dr_command(update.message.text)
