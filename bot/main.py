@@ -5,7 +5,7 @@ from datetime import date, datetime, time
 from logging.handlers import RotatingFileHandler
 from zoneinfo import ZoneInfo
 
-from telegram import Update
+from telegram import BotCommand, Update
 from telegram.error import Conflict, NetworkError
 from telegram.ext import (
     Application,
@@ -34,6 +34,7 @@ from bot.formatter import (
     format_breakouts,
     format_calendar,
     format_dr,
+    format_hot,
     format_lookup,
     format_low_breaks,
     format_open_report,
@@ -45,6 +46,7 @@ from bot.formatter import (
     format_watch_detail,
     format_weekly,
 )
+from bot.hot import classify_watch
 from bot.levels import below_low_5d
 from bot.jobstate import PUSH_WEEKDAYS, already_ran, claim, due_catchup, release
 from bot.openbell import build_open_report, fetch_yahoo_quote, in_open_window
@@ -181,7 +183,10 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/scan 7 — สแกนย้อนหลัง 7 วัน\n"
         "/help — วิธีใช้\n"
         "/status (หรือพิมพ์ สถานะ) — สุขภาพบอท: รันอยู่ไหม/ต้อง restart ไหม,\n"
-        "job วันนี้, รอตอบรับ, FMP 402, error, สแกนล่าสุด\n\n"
+        "job วันนี้, รอตอบรับ, FMP 402, error, สแกนล่าสุด\n"
+        "/hot (หรือพิมพ์ น่าสนใจ) — หุ้นที่ติดตามตัวไหนน่าสนใจตอนนี้:\n"
+        "ใกล้ H5d/H3m ≤3%, เพิ่งทะลุ, งบ ≤3 วัน · หลุด SL/Low ก่อนงบ\n"
+        "คำสั่ง / ของคำสั่งไทย: /watch /unwatch /cal /dr /summary /stats\n\n"
         "ดูราคารายตัว: พิมพ์ ticker ได้เลย เช่น NVDA\n"
         f"หลายตัวพร้อมกัน (สูงสุด {LOOKUP_MAX}): NVDA TSLA AAPL\n"
         "ได้ราคาปิดล่าสุด, %เปลี่ยน, วอลุ่ม, วันงบ,\n"
@@ -226,31 +231,55 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ ดูสถานะล้มเหลว ดู bot.log")
 
 
+def _watched_symbols():
+    """หุ้นที่ติดตามทั้งหมด: manual ก่อน แล้ว auto ที่ไม่ซ้ำ — (symbols, auto_dates)"""
+    manual = load_watchlist()
+    auto = {s: d for s, d in active_auto().items() if s not in manual}
+    return manual + list(auto), auto
+
+
+async def _watch_snapshots(update, symbols):
+    """snapshot ของหุ้นที่ติดตาม [(sym, snap|None)] — ใช้ร่วมกัน ติดตาม / น่าสนใจ
+
+    แจ้งรอเฉพาะตอนต้องยิงเครือข่ายจริง — ช่วงเช้าหลัง job ราคาอยู่ใน cache ครบ
+    """
+    if any(fetch_cache.get(("prices", s, 250)) is None for s in symbols):
+        await update.message.reply_text(f"⏳ กำลังเช็คแนว {len(symbols)} ตัว...")
+    client = FMPClient(api_key=CONFIG.fmp_api_key,
+                       max_api_calls=3 * len(symbols) + 2)
+    universe = load_universe()
+    items = []
+    for sym in symbols:
+        try:
+            snap = await asyncio.to_thread(
+                lookup_symbol, client, sym, universe,
+                fallback_prices_fn=fetch_yahoo_prices)
+        except Exception:
+            logger.exception("watch detail %s failed", sym)
+            snap = None
+        items.append((sym, snap))
+    return items
+
+
+async def _handle_hot(update):
+    """มุมมอง "น่าสนใจตอนนี้" — จัดกลุ่มหุ้นที่ติดตามจาก snapshot เดิม ไม่มี state ใหม่"""
+    symbols, _auto = _watched_symbols()
+    if not symbols:
+        await update.message.reply_text(
+            "ยังไม่มีหุ้นใน watchlist — พิมพ์ เช่น: ติดตาม NVDA")
+        return
+    items = await _watch_snapshots(update, symbols)
+    await update.message.reply_text(format_hot(classify_watch(items)))
+
+
 async def _handle_watch_command(update, action, tickers):
     if action == "show":
-        manual = load_watchlist()
-        auto = {s: d for s, d in active_auto().items() if s not in manual}
-        if not manual and not auto:
+        symbols, auto = _watched_symbols()
+        if not symbols:
             await update.message.reply_text(
                 "ยังไม่มีหุ้นใน watchlist — พิมพ์ เช่น: ติดตาม NVDA")
             return
-        symbols = manual + list(auto)
-        # แจ้งรอเฉพาะตอนต้องยิงเครือข่ายจริง — ช่วงเช้าหลัง job ราคาอยู่ใน cache ครบ
-        if any(fetch_cache.get(("prices", s, 250)) is None for s in symbols):
-            await update.message.reply_text(f"⏳ กำลังเช็คแนว {len(symbols)} ตัว...")
-        client = FMPClient(api_key=CONFIG.fmp_api_key,
-                           max_api_calls=3 * len(symbols) + 2)
-        universe = load_universe()
-        items = []
-        for sym in symbols:
-            try:
-                snap = await asyncio.to_thread(
-                    lookup_symbol, client, sym, universe,
-                    fallback_prices_fn=fetch_yahoo_prices)
-            except Exception:
-                logger.exception("watch detail %s failed", sym)
-                snap = None
-            items.append((sym, snap))
+        items = await _watch_snapshots(update, symbols)
         # ปุ่ม 🗑 รายตัว — กดเอาออกได้เลย ต่อเนื่องกี่ตัวก็ได้ (ปุ่มที่กดหายไปทีละปุ่ม)
         await update.message.reply_text(format_watch_detail(items, auto),
                                         reply_markup=build_unwatch_markup(symbols))
@@ -355,14 +384,38 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """พิมพ์ ticker (ไม่ใช่คำสั่ง /) → snapshot ราคารายตัว · "ติดตาม ..." → watchlist"""
     if not _authorized(update):
         return
-    if update.message.text.strip().lower() in ("สถานะ", "status"):
+    await _dispatch_text(update, context, update.message.text)
+
+
+async def cmd_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """slash alias ของคำสั่งพิมพ์ไทย (เมนู "/" ของ Telegram รับได้เฉพาะ slash):
+    /watch NVDA → "ติดตาม NVDA" เข้า dispatcher เดิม — ไม่มี logic ซ้ำ"""
+    if not _authorized(update):
+        return
+    cmd = update.message.text.split()[0].lstrip("/").split("@")[0].lower()
+    thai = SLASH_ALIASES.get(cmd)
+    if thai is None:
+        return
+    await _dispatch_text(update, context, " ".join([thai, *(context.args or [])]))
+
+
+async def _dispatch_text(update, context, text):
+    """แยกคำสั่งจากข้อความ — ใช้ร่วมกันระหว่างพิมพ์ไทยและ slash alias"""
+    if text.strip().lower() in ("สถานะ", "status"):
         try:
             await _send_status(context.bot, update.effective_chat.id)
         except Exception:
             logger.exception("status failed")
             await update.message.reply_text("⚠️ ดูสถานะล้มเหลว ดู bot.log")
         return
-    if update.message.text.strip() in ("สรุป", "สรุปผล"):
+    if text.strip().lower() in ("น่าสนใจ", "hot"):
+        try:
+            await _handle_hot(update)
+        except Exception:
+            logger.exception("hot failed")
+            await update.message.reply_text("⚠️ ดูน่าสนใจล้มเหลว ดู bot.log")
+        return
+    if text.strip() in ("สรุป", "สรุปผล"):
         try:
             await _send_weekly(context.bot, update.effective_chat.id,
                                notify_empty=True)
@@ -370,14 +423,14 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.exception("weekly summary failed")
             await update.message.reply_text("⚠️ สรุปผลล้มเหลว ดู bot.log")
         return
-    if update.message.text.strip() in ("สถิติ", "สถิติสะสม", "stats"):
+    if text.strip() in ("สถิติ", "สถิติสะสม", "stats"):
         try:
             await _send_stats(context.bot, update.effective_chat.id)
         except Exception:
             logger.exception("stats failed")
             await update.message.reply_text("⚠️ สถิติล้มเหลว ดู bot.log")
         return
-    cal_cmd = parse_calendar_command(update.message.text)
+    cal_cmd = parse_calendar_command(text)
     if cal_cmd is not None:
         try:
             await _handle_calendar(update, cal_cmd)
@@ -387,15 +440,15 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "⚠️ ดึงปฏิทินงบล้มเหลว ลองใหม่อีกครั้งนะครับ")
         return
     # เช็คก่อน lookup — "DR" เองก็เข้ารูป ticker จะโดนตีความผิดเป็นหุ้น
-    dr_cmd = parse_dr_command(update.message.text)
+    dr_cmd = parse_dr_command(text)
     if dr_cmd is not None:
         await _handle_dr(update, dr_cmd)
         return
-    watch = parse_watch_command(update.message.text)
+    watch = parse_watch_command(text)
     if watch:
         await _handle_watch_command(update, *watch)
         return
-    tickers = parse_tickers(update.message.text)
+    tickers = parse_tickers(text)
     if not tickers:
         await update.message.reply_text(
             "พิมพ์ ticker หุ้น US เช่น NVDA หรือหลายตัว: NVDA TSLA "
@@ -721,6 +774,32 @@ async def on_button(update, context):
         logger.warning("edit reply markup failed (ข้อความเก่า?): %s", e)
 
 
+# เมนู "/" ใน Telegram (setMyCommands ตอน start) — ชื่อ a-z0-9_ ≤32, คำอธิบาย ≤256
+BOT_COMMANDS = [
+    ("scan", "สแกนหุ้นหลังงบดี 2 วันล่าสุด (ใส่เลข = ย้อนหลัง N วัน)"),
+    ("hot", "หุ้นที่ติดตามตัวไหนน่าสนใจตอนนี้ (ใกล้แนว/เพิ่งทะลุ/งบใกล้/หลุด SL)"),
+    ("watch", "ดู watchlist + แนวรายตัว · /watch NVDA = ติดตาม"),
+    ("unwatch", "เลิกติดตาม: /unwatch NVDA"),
+    ("cal", "ปฏิทินงบ universe วันนี้+2 วัน (ใส่เลข 0-7)"),
+    ("dr", "DR ไทยแพง/ถูกกว่าหุ้นแม่แค่ไหน: /dr NVDA"),
+    ("summary", "ผลหุ้นที่บอทแจ้งย้อนหลัง 30 วัน"),
+    ("stats", "สถิติสะสมทุกสัญญาณ (win rate, drift, หลุด SL)"),
+    ("status", "สุขภาพบอท: job วันนี้, รอตอบรับ, FMP 402, error"),
+    ("help", "วิธีใช้ทั้งหมด"),
+]
+# slash → คำสั่งไทยเดิม (ส่งเข้า _dispatch_text) — /scan /status /help มี handler ตรงอยู่แล้ว
+SLASH_ALIASES = {"watch": "ติดตาม", "unwatch": "เลิกติดตาม", "hot": "น่าสนใจ",
+                 "summary": "สรุป", "stats": "สถิติ", "dr": "dr", "cal": "งบ"}
+
+
+async def register_commands(app):
+    """post_init: ลงทะเบียนเมนูคำสั่งกับ Telegram — ล้ม (เน็ต) แค่ log ไม่ให้บอทตาย"""
+    try:
+        await app.bot.set_my_commands([BotCommand(c, d) for c, d in BOT_COMMANDS])
+    except Exception as e:
+        logger.warning("set_my_commands failed: %s", e)
+
+
 async def on_error(update, context):
     """error กลางของ PTB — เดิมไม่มี ทุก error ลง log เป็น "No error handlers are registered" """
     err = context.error
@@ -735,13 +814,15 @@ async def on_error(update, context):
 
 def build_app(config):
     """ประกอบ Application: handlers + งานตั้งเวลา (แยกจาก main ให้เทสตรวจ wiring ได้)"""
-    app = Application.builder().token(config.telegram_token).build()
+    app = (Application.builder().token(config.telegram_token)
+           .post_init(register_commands).build())
     # รับเฉพาะข้อความใหม่ — ข้อความที่ถูก "แก้ไข" (edited) ผ่าน filters.TEXT ได้
     # แต่ update.message เป็น None → handler เดิม AttributeError เงียบ
     new_msg = filters.UpdateType.MESSAGE
     app.add_handler(CommandHandler(["start", "help"], cmd_help, filters=new_msg))
     app.add_handler(CommandHandler("scan", cmd_scan, filters=new_msg))
     app.add_handler(CommandHandler("status", cmd_status, filters=new_msg))
+    app.add_handler(CommandHandler(list(SLASH_ALIASES), cmd_alias, filters=new_msg))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & new_msg, on_text))
     app.add_handler(CallbackQueryHandler(on_button))
     app.add_error_handler(on_error)

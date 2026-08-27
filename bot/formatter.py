@@ -1,6 +1,7 @@
 """จัดข้อความ Telegram (plain text ภาษาไทย)"""
 from datetime import date, timedelta
 
+from bot.hot import EARNINGS_SOON_DAYS, HOT_PCT
 from bot.levels import below_low_5d
 from bot.stats import HORIZONS
 
@@ -579,4 +580,66 @@ def format_status(st):
                      + (f" · API {made}/{mx}" if made is not None else ""))
     else:
         lines.append("🔍 ยังไม่เคยสแกน")
+    return "\n".join(lines)[:MAX_LEN]
+
+
+# ── น่าสนใจตอนนี้ (/hot) ───────────────────────────────────────────
+
+_LEVEL_SHORT = {"high_5d": "H5d", "high_3m": "H3m"}
+HOT_VOL_NOTE_MIN = 2.0          # โชว์ "vol x.xx" เฉพาะวอลุ่มเด่น (≥ เท่านี้ของเฉลี่ย 20 วัน)
+
+
+def _hot_reason_text(r):
+    kind = r[0]
+    if kind == "break":
+        return "เพิ่งทะลุ " + "/".join(_LEVEL_SHORT[k] for k in r[1]) + " ✅"
+    if kind == "near":
+        return f"อีก {r[2]:.2f}% ถึง {_LEVEL_SHORT[r[1]]} {r[3]:,.2f}"
+    if kind == "pending":
+        return "⏳ รอตอบรับงบ"
+    if kind == "earnings":
+        when = _DAYS_TH.get(r[1], f"อีก {r[1]} วัน")
+        label = _TIMING_TH.get(r[2])
+        return f"งบ{when}" + (f" {label}" if label else "")
+    if kind == "sl":
+        return f"หลุด SL {r[1]:,.2f}"
+    if kind == "low":
+        return f"🛑 ปิดใต้ Low ก่อนงบ {r[1]:,.2f}"
+    return kind
+
+
+def _hot_line(icon, entry):
+    s = entry["snap"]
+    parts = [_hot_reason_text(r) for r in entry["reasons"]]
+    vol = s.get("vol_ratio")
+    if vol is not None and vol >= HOT_VOL_NOTE_MIN:
+        parts.append(f"vol {vol:.1f}x")
+    lv = s.get("levels")
+    if icon != "⛔" and lv and lv.get("sl") is not None:
+        parts.append(f"SL {lv['sl']:,.2f}")
+    return (f"{icon} {entry['symbol']} {s['price']:,.2f} "
+            f"({_signed(s['day_change_pct'])}) — " + " · ".join(parts))
+
+
+def format_hot(g):
+    """ข้อความจาก hot.classify_watch — หัว 🔥 x/ทั้งหมด · ⚠️ · 😴 · ดึงไม่ได้ · บรรทัดเกณฑ์"""
+    lines = []
+    if not g["hot"] and not g["risk"]:
+        lines.append(f"😴 ยังไม่มีตัวไหนถึงจุดน่าสนใจ ({g['total']} ตัว) — "
+                     "พิมพ์ ติดตาม ดูแนวทั้งหมด")
+    else:
+        lines.append(f"🔥 น่าสนใจตอนนี้ {len(g['hot'])}/{g['total']}")
+        for e in g["hot"]:
+            lines.append(_hot_line(GRADE_ICON.get(e["snap"].get("grade"), "⚪"), e))
+        if g["risk"]:
+            lines += ["", f"⚠️ ต้องตัดสินใจ {len(g['risk'])}"]
+            for e in g["risk"]:
+                lines.append(_hot_line("⛔", e))
+        if g["idle"]:
+            lines += ["", f"😴 ยังไม่ถึงจุด {len(g['idle'])}: {' '.join(g['idle'])}"]
+    if g["failed"]:
+        lines.append(f"⚠️ ดึงข้อมูลไม่ได้: {' '.join(g['failed'])}")
+    if g["hot"] or g["risk"]:
+        lines.append(f"เกณฑ์: ใกล้ H5d/H3m ≤{HOT_PCT:g}% · เพิ่งทะลุ · "
+                     f"งบ ≤{EARNINGS_SOON_DAYS} วัน · หลุด SL/Low ก่อนงบ")
     return "\n".join(lines)[:MAX_LEN]

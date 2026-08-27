@@ -1,6 +1,6 @@
 # สถานะโปรเจค — US Earnings Screener Bot
 
-> อัปเดตล่าสุด: 2026-08-27 (รอบสิบหก: คำสั่ง /status + ทบทวนรายการค้าง)
+> อัปเดตล่าสุด: 2026-08-27 (รอบสิบเจ็ด: น่าสนใจตอนนี้ /hot + เมนูคำสั่ง Telegram)
 
 ## โปรเจคนี้คืออะไร
 
@@ -45,6 +45,7 @@ Telegram bot (`@Sakuro_usbot`) คัดกรองหุ้น US "อาก�
 | ปุ่ม inline ติดตาม/เลิกติดตาม (21 ส.ค. รอบสิบสาม) | `bot/buttons.py` ใหม่ — กดจากข้อความได้เลยไม่ต้องพิมพ์: lookup รายตัวมีปุ่ม ➕/📌 (หลาย ticker ≥2 → แถว "ติดตามทั้ง N ตัว" บนข้อความแรกที่สำเร็จ กดทีเดียวทั้งชุด) · ข้อความสแกนสุดท้ายมีปุ่ม "📌 ติดตามถาวรทั้งหมด (ชื่อ)" + ปุ่มใต้กราฟ candidate รายตัว · พิมพ์ `ติดตาม` → ปุ่ม 🗑 รายตัว (3 ปุ่ม/แถว) กดเอาออกต่อเนื่องได้ ปุ่มที่กดหายทีละปุ่ม · callback data `w:`/`wa:`/`u:` จำกัด 64 bytes + validate ticker, ปุ่มกดแล้วปลดชนวนเป็น `-` · `on_button`: **ทำงานจริงก่อนค่อย answer/edit** (query ค้างช่วงบอทปิด answer ล้มได้ งานไม่สูญ), answer เสมอกันปุ่มหมุนค้าง, edit บนข้อความ >48 ชม. (InaccessibleMessage) ล้มเงียบ, auth จาก `from_user.id` (ไม่ใช้ effective_chat ที่เป็น None ได้) · refactor `watchlist.remove_everywhere` ใช้ร่วมพิมพ์+ปุ่ม · tests 355 |
 | แก้บั๊ก 4 จุดจากรีวิว (27 ส.ค. รอบสิบห้า) | รีวิวทั้งโปรเจคแล้วแก้: (1) **คะแนนไม่สนทิศทาง** — `gap_size_calculator` ให้คะแนน `abs(gap)` และอีก 4 factor ไม่บังคับตอบรับบวก → หุ้น gap ลง -9% ในขาขึ้นคำนวณได้เกรด B; เพิ่ม `levels.reaction_pct` (ปิด D0 เทียบปิดวันก่อน) + `levels.positive_reaction()` แล้วให้ `run_scan` ตัดก่อนให้เกรด นับแยก `skipped_counts["down"]` (ข้อความ "ตอบรับลบ=N"), lookup ไม่ให้เกรดตัวที่ปิดลบ (formatter บอก "ตอบรับลบ x% — ไม่เข้าเกณฑ์"), candidate โชว์ "ปิดวันงบ +x%" (2) **งบ AMC ศุกร์/ก่อนวันหยุด US หลุดสแกนถาวร** — D0 = จันทร์ แท่งมาอังคารเช้า แต่ปฏิทินสแกนอังคาร (lookback 2 วัน) เริ่มอาทิตย์ → entry หาย; `bot/pending.py` จำ entry ที่ยังรอ (waiting/no_data — ไม่จำ not_in_plan) ลง `pending.json` (gitignored) แล้ว `run_scan` เติมกลับเข้า reported ทุกรอบ (ปฏิทินรอบนี้ชนะเรื่อง symbol ซ้ำ, timing `bmo*` ล้างเป็น unknown, หมดอายุ 10 วันหลังวันงบ); `run_scan` รับ `today`/`pending_path` (เทส) · `tests/conftest.py` แยก pending ไป tmp ทุกเทส (3) **restart loop ชน instance lock** — เดิม `SystemExit(str)` = code 1 เหมือน crash → `run_bot.bat` วนทุก 60 วิ (21 ส.ค. ERROR 230 บรรทัด/1.5 ชม.); ตอนนี้ `EXIT_ALREADY_RUNNING = 3` และ bat เห็น code 3 แล้ว `exit /b` ไม่วน (4) **error FMP หายกับ stderr** — บอทรันผ่าน .vbs ไม่มี console; `fmp_client.py` เปลี่ยน `print` 6 จุดเป็น logger `bot.fmp` (402 = INFO, ล้มจริง/timeout/429 = WARNING, ยอมแพ้ 429 = ERROR, endpoint สำรอง quiet = DEBUG) URL/params ไม่มี key จึง log ได้ · tests 397 |
 | คำสั่ง `/status` (27 ส.ค. รอบสิบหก) | พิมพ์ `/status` หรือ `สถานะ`/`status` — `bot/status.py` (ทุก path ฉีดได้ เทสง่าย) + `format_status`: PID / เริ่มเมื่อ / uptime · **โค้ดที่รันอยู่ (commit จำตอน import ≈ process start) เทียบ HEAD ปัจจุบัน — อ่าน `.git/HEAD` + refs/packed-refs ตรงๆ ไม่พึ่ง git CLI → ⚠️ บอกให้ restart ถ้า HEAD ใหม่กว่า** (คำถาม ops ที่เจอบ่อยสุด) · job เช้าวันนี้จาก `job_state.json` เทียบ `jobstate.SCHEDULE`: ✅ รันแล้ว / ❌ ถึงเวลาแล้วยังไม่รัน (catch-up จะเก็บ) / ⏳ ยังไม่ถึงเวลา / — ไม่มีรอบวันนี้ + วันล่าสุด · รอตอบรับจาก `pending.json` · watchlist manual/auto · สัญญาณสะสม + ตัวล่าสุด · นับจาก `bot.log` เฉพาะบรรทัดวันนี้: หุ้นที่ FMP ตอบ 402 (ไม่ซ้ำ — ดึง symbol จาก params หรือ path ของ URL), WARNING/ERROR + ข้อความ error ล่าสุด · สแกนล่าสุดจาก `reports/scan_*.json` (A/B, C/D, รอ, API ที่ใช้) · รายชื่อยาวตัดที่ 10 ตัว "+N" · อ่านไฟล์ใน `asyncio.to_thread` · tests 436 |
+| น่าสนใจตอนนี้ + เมนูคำสั่ง Telegram (27 ส.ค. รอบสิบเจ็ด) | (1) พิมพ์ `น่าสนใจ`/`hot` หรือ `/hot` — `bot/hot.py::classify_watch` pure จาก snapshot เดิม (ไม่ดึงเพิ่ม ไม่มี state ใหม่ ไม่มีคะแนนถ่วงน้ำหนัก): 🔥 เพิ่งทะลุ H5d/H3m (`new_breaks`) / ต่ำกว่าแนวไม่เกิน `HOT_PCT`=3% / งบถัดไป ≤`EARNINGS_SOON_DAYS`=3 วัน / รอตอบรับงบ — เรียง เพิ่งทะลุ → ใกล้สุด → รอตอบรับ → งบใกล้ · ⚠️ หลุด SL (edge หรือปิดใต้ SL) / ปิดใต้ Low ก่อนงบ — **อันตรายชนะ ไม่ปนกับ 🔥** · 😴 ที่เหลือยุบบรรทัดเดียว · ดึงไม่ได้แยกบรรทัด · reasons เป็น tuple รหัส formatter แปลไทย (`format_hot` — vol โชว์เฉพาะ ≥2x, ป้าย timing ใช้ `_TIMING_TH` เดิม) · refactor `_watched_symbols` + `_watch_snapshots` ใช้ร่วมกับ `ติดตาม` (ตัด loop ซ้ำ) (2) **เมนู "/" ใน Telegram** — `BOT_COMMANDS` 10 คำสั่ง ลงทะเบียนด้วย `set_my_commands` ใน `post_init` (`register_commands` ล้มแค่ log) · เมนูรับได้เฉพาะ slash → เพิ่ม `SLASH_ALIASES` `/watch /unwatch /hot /cal /dr /summary /stats` ผ่าน `cmd_alias` ที่แปลงเป็นข้อความไทยส่งเข้า `_dispatch_text` (on_text แยก body ออกมาเป็น dispatcher — logic เดิมไม่ซ้ำ รองรับ `/watch@bot`) · เทสยืนยันทุกคำสั่งในเมนูมี handler + ทุก alias อยู่ในเมนู · tests 478 |
 
 ## 🔧 บั๊กที่เจอและแก้แล้วระหว่างทาง
 
@@ -79,14 +80,14 @@ pending 18 ตัว (NVDA, CRWD, CRM, SNPS, A, VEEV, HPQ, MRVL, ADSK, WDAY, AFR
 | 5 | patch `fmp_client` ต้นฉบับใน skills `earnings-trade-analyzer` + `pead-screener` ให้ใช้ `stable/historical-price-eod/full` | เล็ก | นอกโปรเจค — ดูหัวข้อ "บั๊ก" ข้อ 1 |
 | 6 | **ย้าย host หรือตัด openbell** — `openbell_job` (ยืนยันเปิดตลาด US 21:00/22:00) **ไม่เคยรันเลยตั้งแต่สร้าง** (bot.log มีแต่ "Added job") เพราะเครื่องปิดก่อน 21:00 แทบทุกวัน | ตัดสินใจ | ย้าย cloud (VPS/Fly/Oracle free tier) หรือตัดฟีเจอร์ทิ้ง — user ต้องเลือก |
 | 7 | สรุปก่อน SET เปิด (ผลคืน US ของหุ้นที่ติดตาม + DR premium) | กลาง | ข้อเสนอจากรีวิวรอบสิบห้า |
-| 8 | ไอเดียต่อยอด: แนบ DR premium ใน lookup อัตโนมัติ · เตือนเมื่อ DR ที่ติดตาม discount เกินเกณฑ์ · drift รายสัปดาห์ด้วย logic pead-screener | — | |
+| 8 | ~~มุมมอง "น่าสนใจตอนนี้" ของ watchlist~~ ✅ รอบสิบเจ็ด (`/hot`) · ไอเดียต่อยอด: แนบ DR premium ใน lookup อัตโนมัติ · เตือนเมื่อ DR ที่ติดตาม discount เกินเกณฑ์ · drift รายสัปดาห์ด้วย logic pead-screener | — | |
 
 เสร็จแล้ว (ย้ายมาจากรายการเดิม): PR #1 merge → ทำงานบน `master` ตรงๆ ไม่ใช้ feature branch (20 ส.ค.; branch เก่าเหลือบน GitHub ลบได้จากหน้า PR) ·
 เช็ค push อัตโนมัติรอบแรก (21 ส.ค.: catch-up ชดเชยครบ, บ่ายเจอบั๊ก D0 → EL/TGT เกรด B) · DR premium/discount (รอบห้า/หก)
 
 ## วิธีใช้งาน / ดูแล
 
-- สั่งใน Telegram: `/scan`, `/scan 7`, `/help` (bot ตอบเฉพาะ chat_id ใน `.env`)
+- สั่งใน Telegram: เมนู `/` มี `/scan /hot /watch /unwatch /cal /dr /summary /stats /status /help` (พิมพ์ไทย `ติดตาม`/`น่าสนใจ`/`งบ`/`dr`/`สรุป`/`สถิติ`/`สถานะ` ได้เหมือนเดิม; bot ตอบเฉพาะ chat_id ใน `.env`)
 - Log: `bot.log` · ผลสแกน: `reports/scan_*.json|md`
 - หยุด bot: ดูหัวข้อ "ตั้งรันอัตโนมัติ" ใน `README.md` (ระวัง restart loop + อย่ารัน 2 instance ซ้อน)
 - ทดสอบ: `python -m pytest -q`
