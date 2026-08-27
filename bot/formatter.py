@@ -479,3 +479,104 @@ def format_scan(scan):
         messages.append(current)
         messages.append(footer)
     return messages
+
+
+# ── /status ──────────────────────────────────────────────────────
+
+_JOB_LABEL = {"breakout": "ทะลุแนว", "reminder": "เตือนงบ", "scan": "สแกน",
+              "weekly": "สรุปสัปดาห์"}
+_JOB_ICON = {"done": "✅", "due": "❌", "pending": "⏳", "off": "—"}
+_THAI_WD = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"]
+STATUS_LIST_MAX = 10            # รายชื่อหุ้นต่อบรรทัด เกินโชว์ "+N"
+
+
+def _fmt_duration(delta):
+    mins = int(delta.total_seconds() // 60)
+    if mins < 1:
+        return "<1 น."
+    days, rem = divmod(mins, 1440)
+    hours, mins = divmod(rem, 60)
+    if days:
+        return f"{days} วัน {hours} ชม."
+    if hours:
+        return f"{hours} ชม. {mins} น."
+    return f"{mins} น."
+
+
+def _sym_list(symbols, limit=STATUS_LIST_MAX):
+    shown = " ".join(symbols[:limit])
+    extra = len(symbols) - limit
+    return f"{shown} +{extra}" if extra > 0 else shown
+
+
+def format_status(st):
+    """สถานะบอทจาก build_status — ตอบว่ารันอยู่ไหม/ต้อง restart ไหม/job วันนี้ครบไหม/ปัญหาวันนี้"""
+    now = st["now"]
+    lines = [f"🤖 สถานะบอท {now:%Y-%m-%d %H:%M} ({_THAI_WD[now.weekday()]})"]
+    started = st.get("started_at")
+    if started:
+        since = f"{started:%H:%M}" if started.date() == now.date() else f"{started:%Y-%m-%d %H:%M}"
+        lines.append(f"รันอยู่ PID {st['pid']} · เริ่ม {since} · uptime "
+                     f"{_fmt_duration(now - started)}")
+    else:
+        lines.append(f"รันอยู่ PID {st['pid']} · เริ่มเมื่อ ไม่ทราบ")
+    run_c, head_c = st.get("started_commit"), st.get("head_commit")
+    if not run_c:
+        lines.append("โค้ดที่รัน: ไม่ทราบ commit")
+    elif head_c and head_c != run_c:
+        # กรณีที่เจอบ่อย: commit แล้วลืม restart — โค้ดใหม่ยังไม่ live
+        lines.append(f"โค้ด {run_c} ⚠️ HEAD ใหม่กว่า ({head_c}) — restart บอทเพื่อโหลดโค้ดใหม่")
+    elif head_c:
+        lines.append(f"โค้ด {run_c} ✅ ตรงกับ HEAD")
+    else:
+        lines.append(f"โค้ด {run_c}")
+
+    lines += ["", "📅 Job วันนี้"]
+    for j in st["jobs"]:
+        label = f"{_JOB_LABEL.get(j['name'], j['name'])} {j['time']:%H:%M}"
+        icon = _JOB_ICON.get(j["state"], "?")
+        last = f" · ล่าสุด {j['last']}" if j.get("last") else ""
+        if j["state"] == "done":
+            lines.append(f"{icon} {label}")
+        elif j["state"] == "due":
+            lines.append(f"{icon} {label} — ถึงเวลาแล้วยังไม่รัน "
+                         f"(catch-up ลองทุก 30 น.){last}")
+        elif j["state"] == "pending":
+            lines.append(f"{icon} {label} (ยังไม่ถึงเวลา){last}")
+        else:
+            lines.append(f"{icon} {label} (ไม่มีรอบวันนี้){last}")
+
+    lines.append("")
+    pend = st["pending"]
+    lines.append(f"⏳ รอตอบรับงบ {len(pend)}" + (f": {_sym_list(pend)}" if pend else ""))
+    man, auto = st["watch_manual"], st["watch_auto"]
+    lines.append(f"📌 ติดตาม manual {len(man)}" + (f" ({_sym_list(man)})" if man else "")
+                 + f" · auto {len(auto)}" + (f" ({_sym_list(auto)})" if auto else ""))
+    sig = st.get("last_signal")
+    lines.append(f"📊 สัญญาณสะสม {st['signals_total']}"
+                 + (f" · ล่าสุด {sig['symbol']} {sig['grade']} ({sig['flag_date']})"
+                    if sig else ""))
+
+    lines.append("")
+    log = st["log"]
+    s402 = log["fmp_402"]
+    lines.append(f"🔌 FMP วันนี้: 402 = {len(s402)} ตัว"
+                 + (f" ({_sym_list(s402)})" if s402 else "")
+                 + f" · เตือน {log['warnings']} · error {log['errors']}")
+    if log.get("last_error"):
+        lines.append(f"↳ error ล่าสุด: {log['last_error'][:150]}")
+
+    scan = st.get("scan")
+    if scan:
+        cands = scan["candidates"]
+        ab = f"A/B {len(cands)}" + (
+            " (" + " ".join(f"{s}:{g}" for s, g in cands) + ")" if cands else "")
+        skipped = " ".join(f"{k}={v}" for k, v in scan["skipped"].items())
+        made, mx = scan["api_calls"]
+        lines.append(f"🔍 สแกนล่าสุด {scan['at']:%Y-%m-%d %H:%M}: {ab}"
+                     + (f" · {skipped}" if skipped else "")
+                     + f" · รอ {scan['pending']}"
+                     + (f" · API {made}/{mx}" if made is not None else ""))
+    else:
+        lines.append("🔍 ยังไม่เคยสแกน")
+    return "\n".join(lines)[:MAX_LEN]

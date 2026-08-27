@@ -1,6 +1,6 @@
 # สถานะโปรเจค — US Earnings Screener Bot
 
-> อัปเดตล่าสุด: 2026-08-27 (รอบสิบห้า: แก้บั๊ก 4 จุดจากรีวิวทั้งโปรเจค)
+> อัปเดตล่าสุด: 2026-08-27 (รอบสิบหก: คำสั่ง /status + ทบทวนรายการค้าง)
 
 ## โปรเจคนี้คืออะไร
 
@@ -44,6 +44,7 @@ Telegram bot (`@Sakuro_usbot`) คัดกรองหุ้น US "อาก�
 | ปฏิทินงบล่วงหน้า + dr ราคาสด (24 ส.ค. รอบสิบสี่) | (1) พิมพ์ `งบ` = หุ้น universe ที่จะออกงบวันนี้+2 วันข้างหน้า / `งบ 5` (สูงสุด 7) / `งบวันนี้` — `bot/calendar_preview.py`: FMP earnings calendar 1 call + NASDAQ เสริม timing (merge/canon แบบ run_scan), cache 60 นาที, `format_calendar` จัดกลุ่มรายวัน → BMO/AMC/ไม่ระบุ, ticker ติดป้าย 🇹🇭 (มี DR) / 📌 (ใน watchlist), รายชื่อยาวตัดแถวละ 10 ตัว + แบ่งข้อความตาม MAX_LEN, ทุกวันในช่วงแสดงเสมอแม้ "ไม่มี" (2) `dr NVDA` ใช้ **quote สด** จาก Yahoo (fetch_yahoo_quote ได้พารามิเตอร์ `raw=True` ไม่แปลงจุด — รองรับ `.BK`/`=X`) ทั้งราคา DR และ USDTHB ไม่ cache · `compute_premium` รับ dr_quote/fx_quote ทับ close แท่งล่าสุด (baseline รายวันเดิม) + field ใหม่ live/day_pct/fx_live, format_dr โชว์ `(สด · วันนี้ ±x%)` แทนวันที่แท่ง · quote ล้ม fallback EOD เดิม · smoke จริงผ่าน (ปฏิทิน 12 ตัว, NVDA80 สด +0.7%) |
 | ปุ่ม inline ติดตาม/เลิกติดตาม (21 ส.ค. รอบสิบสาม) | `bot/buttons.py` ใหม่ — กดจากข้อความได้เลยไม่ต้องพิมพ์: lookup รายตัวมีปุ่ม ➕/📌 (หลาย ticker ≥2 → แถว "ติดตามทั้ง N ตัว" บนข้อความแรกที่สำเร็จ กดทีเดียวทั้งชุด) · ข้อความสแกนสุดท้ายมีปุ่ม "📌 ติดตามถาวรทั้งหมด (ชื่อ)" + ปุ่มใต้กราฟ candidate รายตัว · พิมพ์ `ติดตาม` → ปุ่ม 🗑 รายตัว (3 ปุ่ม/แถว) กดเอาออกต่อเนื่องได้ ปุ่มที่กดหายทีละปุ่ม · callback data `w:`/`wa:`/`u:` จำกัด 64 bytes + validate ticker, ปุ่มกดแล้วปลดชนวนเป็น `-` · `on_button`: **ทำงานจริงก่อนค่อย answer/edit** (query ค้างช่วงบอทปิด answer ล้มได้ งานไม่สูญ), answer เสมอกันปุ่มหมุนค้าง, edit บนข้อความ >48 ชม. (InaccessibleMessage) ล้มเงียบ, auth จาก `from_user.id` (ไม่ใช้ effective_chat ที่เป็น None ได้) · refactor `watchlist.remove_everywhere` ใช้ร่วมพิมพ์+ปุ่ม · tests 355 |
 | แก้บั๊ก 4 จุดจากรีวิว (27 ส.ค. รอบสิบห้า) | รีวิวทั้งโปรเจคแล้วแก้: (1) **คะแนนไม่สนทิศทาง** — `gap_size_calculator` ให้คะแนน `abs(gap)` และอีก 4 factor ไม่บังคับตอบรับบวก → หุ้น gap ลง -9% ในขาขึ้นคำนวณได้เกรด B; เพิ่ม `levels.reaction_pct` (ปิด D0 เทียบปิดวันก่อน) + `levels.positive_reaction()` แล้วให้ `run_scan` ตัดก่อนให้เกรด นับแยก `skipped_counts["down"]` (ข้อความ "ตอบรับลบ=N"), lookup ไม่ให้เกรดตัวที่ปิดลบ (formatter บอก "ตอบรับลบ x% — ไม่เข้าเกณฑ์"), candidate โชว์ "ปิดวันงบ +x%" (2) **งบ AMC ศุกร์/ก่อนวันหยุด US หลุดสแกนถาวร** — D0 = จันทร์ แท่งมาอังคารเช้า แต่ปฏิทินสแกนอังคาร (lookback 2 วัน) เริ่มอาทิตย์ → entry หาย; `bot/pending.py` จำ entry ที่ยังรอ (waiting/no_data — ไม่จำ not_in_plan) ลง `pending.json` (gitignored) แล้ว `run_scan` เติมกลับเข้า reported ทุกรอบ (ปฏิทินรอบนี้ชนะเรื่อง symbol ซ้ำ, timing `bmo*` ล้างเป็น unknown, หมดอายุ 10 วันหลังวันงบ); `run_scan` รับ `today`/`pending_path` (เทส) · `tests/conftest.py` แยก pending ไป tmp ทุกเทส (3) **restart loop ชน instance lock** — เดิม `SystemExit(str)` = code 1 เหมือน crash → `run_bot.bat` วนทุก 60 วิ (21 ส.ค. ERROR 230 บรรทัด/1.5 ชม.); ตอนนี้ `EXIT_ALREADY_RUNNING = 3` และ bat เห็น code 3 แล้ว `exit /b` ไม่วน (4) **error FMP หายกับ stderr** — บอทรันผ่าน .vbs ไม่มี console; `fmp_client.py` เปลี่ยน `print` 6 จุดเป็น logger `bot.fmp` (402 = INFO, ล้มจริง/timeout/429 = WARNING, ยอมแพ้ 429 = ERROR, endpoint สำรอง quiet = DEBUG) URL/params ไม่มี key จึง log ได้ · tests 397 |
+| คำสั่ง `/status` (27 ส.ค. รอบสิบหก) | พิมพ์ `/status` หรือ `สถานะ`/`status` — `bot/status.py` (ทุก path ฉีดได้ เทสง่าย) + `format_status`: PID / เริ่มเมื่อ / uptime · **โค้ดที่รันอยู่ (commit จำตอน import ≈ process start) เทียบ HEAD ปัจจุบัน — อ่าน `.git/HEAD` + refs/packed-refs ตรงๆ ไม่พึ่ง git CLI → ⚠️ บอกให้ restart ถ้า HEAD ใหม่กว่า** (คำถาม ops ที่เจอบ่อยสุด) · job เช้าวันนี้จาก `job_state.json` เทียบ `jobstate.SCHEDULE`: ✅ รันแล้ว / ❌ ถึงเวลาแล้วยังไม่รัน (catch-up จะเก็บ) / ⏳ ยังไม่ถึงเวลา / — ไม่มีรอบวันนี้ + วันล่าสุด · รอตอบรับจาก `pending.json` · watchlist manual/auto · สัญญาณสะสม + ตัวล่าสุด · นับจาก `bot.log` เฉพาะบรรทัดวันนี้: หุ้นที่ FMP ตอบ 402 (ไม่ซ้ำ — ดึง symbol จาก params หรือ path ของ URL), WARNING/ERROR + ข้อความ error ล่าสุด · สแกนล่าสุดจาก `reports/scan_*.json` (A/B, C/D, รอ, API ที่ใช้) · รายชื่อยาวตัดที่ 10 ตัว "+N" · อ่านไฟล์ใน `asyncio.to_thread` · tests 436 |
 
 ## 🔧 บั๊กที่เจอและแก้แล้วระหว่างทาง
 
@@ -61,14 +62,27 @@ Telegram bot (`@Sakuro_usbot`) คัดกรองหุ้น US "อาก�
 
 ## ⏳ ค้างอยู่ / งานต่อ session หน้า
 
-1. ~~เปิด PR~~ ✅ PR #1 merge แล้ว (20 ส.ค.) — **ต่อจากนี้ทำงานบน `master` ตรงๆ ไม่ใช้ feature branch**
-   (branch `feature/telegram-earnings-bot` ลบในเครื่องแล้ว เหลือบน GitHub ลบได้จากหน้า PR)
-2. ~~เช็คผล push อัตโนมัติรอบแรก~~ ✅ ศุกร์ 21 ส.ค.: เครื่องเปิด 09:05 → catch-up ยิง breakout/reminder/scan ชดเชยครบ
-   ผลสแกนเช้า: ไม่มี A/B (C=3, D=4) · บ่ายวันเดียวกันเจอบั๊ก D0 ผิดวัน (รอบสิบสอง) → สแกนซ้ำได้ EL/TGT เกรด B
-   เหลือเช็คเสาร์ 22 ส.ค. 08:30: **ROST (งบ 20 ส.ค. AMC) จะได้เกรดจากแท่ง 21 ส.ค.**
-3. (เสนอ) **patch fmp_client ต้นฉบับ** ใน earnings-trade-analyzer + pead-screener skills ให้ใช้ endpoint ใหม่ (ตามข้อ 1 ด้านบน)
-4. (ไอเดีย) ต่อยอด: ติดตาม drift รายสัปดาห์ด้วย logic pead-screener หลังหุ้นติดเกรด A/B
-5. ~~DR premium/discount~~ ✅ เสร็จแล้ว (รอบหก) — ไอเดียต่อยอด: แนบ premium ใน lookup อัตโนมัติเมื่อหุ้นมี DR, เตือนเมื่อ DR ที่ติดตาม discount เกินเกณฑ์
+> ทบทวน 2026-08-27 หลังรอบสิบห้า — เรียงตามลำดับที่แนะนำให้ทำ (รายการเก่าที่เสร็จแล้วย้ายไปท้ายหัวข้อ)
+
+**จับตาก่อน ไม่ต้องเขียนโค้ด — ศุกร์ 28 ส.ค. 08:30 คือการทดสอบจริงครั้งแรกของรอบสิบห้าทั้งชุด:**
+pending 18 ตัว (NVDA, CRWD, CRM, SNPS, A, VEEV, HPQ, MRVL, ADSK, WDAY, AFRM, ULTA … AMC 26–27 ส.ค.) ต้องไหลจาก `pending.json` เข้าสแกนและได้เกรด ·
+ตัวที่ปิดลบต้องขึ้น "ตอบรับลบ=N" · `bot.log` จะโชว์ `bot.fmp` 402 เป็นครั้งแรก
+(สแกน 27 ส.ค. รัน 08:30 *ก่อน* restart 09:03 → ยังเป็นโค้ดเก่า 402 ใน log = 0 ไม่ใช่เพราะไม่เจอ) → จะได้นับว่า universe โดน 402 จริงกี่ตัว
+ใช้ `/status` ดูผลจากมือถือได้เลย
+
+| # | งาน | ขนาด | หมายเหตุ |
+|---|---|---|---|
+| 1 | ~~คำสั่ง `/status`~~ ✅ รอบสิบหก (27 ส.ค.) — uptime/PID, โค้ดที่รันตรง HEAD ไหม, job วันนี้, pending/watch/สัญญาณ, 402+error วันนี้, สแกนล่าสุด | เล็ก | ใช้เช็คผลสแกนศุกร์ 28 ส.ค. จากมือถือ |
+| 2 | **แผนเทรดแปลงราคาเป็น DR** — SL / High 5 วัน / High 3 เดือน → ราคาบาทของ DR ผ่าน implied ratio ที่ `bot/dr.py` มีอยู่แล้ว | กลาง | ตรงกับการเทรดจริงของ user ที่สุด |
+| 3 | **filter คุณภาพ + backtest ย้อนหลัง** — พิสูจน์ว่าเกรด A/B มี edge จริงก่อนเชื่อสัญญาณ | ใหญ่ | ติด 402/budget FMP: ราคาต้องพึ่ง Yahoo, วันงบย้อนหลังจาก `stable/earnings` 1 call/ตัว (566 ตัว vs budget 200/วัน → แบ่งหลายวัน) |
+| 4 | gem-lab เฟสสอง: round-trip ส่ง trade plan จาก gem_out กลับ Telegram | กลาง | ฝั่ง gem-lab อ่าน signals/breakouts ของบอทได้แล้ว (รอบแปด) |
+| 5 | patch `fmp_client` ต้นฉบับใน skills `earnings-trade-analyzer` + `pead-screener` ให้ใช้ `stable/historical-price-eod/full` | เล็ก | นอกโปรเจค — ดูหัวข้อ "บั๊ก" ข้อ 1 |
+| 6 | **ย้าย host หรือตัด openbell** — `openbell_job` (ยืนยันเปิดตลาด US 21:00/22:00) **ไม่เคยรันเลยตั้งแต่สร้าง** (bot.log มีแต่ "Added job") เพราะเครื่องปิดก่อน 21:00 แทบทุกวัน | ตัดสินใจ | ย้าย cloud (VPS/Fly/Oracle free tier) หรือตัดฟีเจอร์ทิ้ง — user ต้องเลือก |
+| 7 | สรุปก่อน SET เปิด (ผลคืน US ของหุ้นที่ติดตาม + DR premium) | กลาง | ข้อเสนอจากรีวิวรอบสิบห้า |
+| 8 | ไอเดียต่อยอด: แนบ DR premium ใน lookup อัตโนมัติ · เตือนเมื่อ DR ที่ติดตาม discount เกินเกณฑ์ · drift รายสัปดาห์ด้วย logic pead-screener | — | |
+
+เสร็จแล้ว (ย้ายมาจากรายการเดิม): PR #1 merge → ทำงานบน `master` ตรงๆ ไม่ใช้ feature branch (20 ส.ค.; branch เก่าเหลือบน GitHub ลบได้จากหน้า PR) ·
+เช็ค push อัตโนมัติรอบแรก (21 ส.ค.: catch-up ชดเชยครบ, บ่ายเจอบั๊ก D0 → EL/TGT เกรด B) · DR premium/discount (รอบห้า/หก)
 
 ## วิธีใช้งาน / ดูแล
 

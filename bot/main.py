@@ -41,6 +41,7 @@ from bot.formatter import (
     format_scan,
     format_sl_breaks,
     format_stats,
+    format_status,
     format_watch_detail,
     format_weekly,
 )
@@ -53,6 +54,7 @@ from bot.reminders import build_reminders
 from bot.screener import load_universe, run_scan, save_reports
 from bot.signals import load_signals, record_signals, signals_since
 from bot.stats import build_stats, summarize
+from bot.status import build_status
 from bot.weekly import SIGNAL_LOOKBACK_DAYS, build_weekly_items
 from bot.yahoo_prices import fetch_yahoo_prices
 from bot.watchlist import (
@@ -177,7 +179,9 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "คำสั่ง:\n"
         "/scan — สแกนย้อนหลัง 2 วัน\n"
         "/scan 7 — สแกนย้อนหลัง 7 วัน\n"
-        "/help — วิธีใช้\n\n"
+        "/help — วิธีใช้\n"
+        "/status (หรือพิมพ์ สถานะ) — สุขภาพบอท: รันอยู่ไหม/ต้อง restart ไหม,\n"
+        "job วันนี้, รอตอบรับ, FMP 402, error, สแกนล่าสุด\n\n"
         "ดูราคารายตัว: พิมพ์ ticker ได้เลย เช่น NVDA\n"
         f"หลายตัวพร้อมกัน (สูงสุด {LOOKUP_MAX}): NVDA TSLA AAPL\n"
         "ได้ราคาปิดล่าสุด, %เปลี่ยน, วอลุ่ม, วันงบ,\n"
@@ -210,6 +214,16 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "สรุปผลรายสัปดาห์: อาทิตย์ 09:00 น.\n"
         "ยืนยันเปิดตลาด US (หุ้นที่ติดตาม): ~30 นาทีหลังเปิด"
     )
+
+
+async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _authorized(update):
+        return
+    try:
+        await _send_status(context.bot, update.effective_chat.id)
+    except Exception:
+        logger.exception("status failed")
+        await update.message.reply_text("⚠️ ดูสถานะล้มเหลว ดู bot.log")
 
 
 async def _handle_watch_command(update, action, tickers):
@@ -340,6 +354,13 @@ async def _handle_dr(update, tickers):
 async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """พิมพ์ ticker (ไม่ใช่คำสั่ง /) → snapshot ราคารายตัว · "ติดตาม ..." → watchlist"""
     if not _authorized(update):
+        return
+    if update.message.text.strip().lower() in ("สถานะ", "status"):
+        try:
+            await _send_status(context.bot, update.effective_chat.id)
+        except Exception:
+            logger.exception("status failed")
+            await update.message.reply_text("⚠️ ดูสถานะล้มเหลว ดู bot.log")
         return
     if update.message.text.strip() in ("สรุป", "สรุปผล"):
         try:
@@ -611,6 +632,12 @@ async def _send_stats(bot, chat_id):
                  "(ดึงราคาไม่ได้/ข้อมูลย้อนไม่ถึงวันแจ้ง) — ลองใหม่ภายหลัง")
 
 
+async def _send_status(bot, chat_id):
+    """สถานะบอท (/status หรือพิมพ์ "สถานะ") — อ่าน state/log ใน thread กันบล็อก event loop"""
+    st = await asyncio.to_thread(build_status, datetime.now(TZ))
+    await bot.send_message(chat_id=chat_id, text=format_status(st))
+
+
 async def weekly_job(context: ContextTypes.DEFAULT_TYPE):
     """อาทิตย์เช้า: สรุปว่าหุ้นที่บอทเคยแจ้ง ตอนนี้เป็นยังไงบ้าง"""
     if datetime.now(TZ).weekday() != 6:  # อาทิตย์
@@ -714,6 +741,7 @@ def build_app(config):
     new_msg = filters.UpdateType.MESSAGE
     app.add_handler(CommandHandler(["start", "help"], cmd_help, filters=new_msg))
     app.add_handler(CommandHandler("scan", cmd_scan, filters=new_msg))
+    app.add_handler(CommandHandler("status", cmd_status, filters=new_msg))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & new_msg, on_text))
     app.add_handler(CallbackQueryHandler(on_button))
     app.add_error_handler(on_error)
