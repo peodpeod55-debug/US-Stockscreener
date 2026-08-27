@@ -54,3 +54,25 @@ def signals_since(days, path=SIGNALS_PATH, today=None):
     today = today or date.today()
     cutoff = (today - timedelta(days=days)).isoformat()
     return [s for s in load_signals(path) if (s.get("flag_date") or "") >= cutoff]
+
+
+# timing ที่บอทอนุมานเอง/ไม่รู้ — ไม่ส่งต่อเป็นข้อมูลจริง ให้ lookup อนุมานใหม่จากแท่งล่าสุด
+_UNCERTAIN_TIMING = (None, "", "unknown", "bmo*")
+
+
+def earnings_from_signals(symbol, path=None):
+    """วันงบที่บอทบันทึกไว้ตอนให้เกรด (signals.json) ในรูปเดียวกับ FMP raw: [{"date", "time"}]
+
+    fallback ของ lookup_symbol เมื่อ FMP รายตัวไม่ให้ (402 แผนฟรี เช่น EL) —
+    ปฏิทินรวมตอนสแกนเห็นหุ้นตัวนั้น แต่ stable/earnings?symbol= ถูกบล็อก
+    path resolve ตอนเรียก (ไม่ใช่ตอน def) ให้เทส/conftest สลับไฟล์ได้
+    """
+    path = path or SIGNALS_PATH
+    out = []
+    for s in load_signals(path):
+        if s.get("symbol") != symbol or not s.get("earnings_date"):
+            continue
+        t = s.get("timing")
+        out.append({"date": s["earnings_date"],
+                    "time": None if t in _UNCERTAIN_TIMING else t})
+    return out

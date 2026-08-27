@@ -15,6 +15,7 @@ if str(ETA_DIR) not in sys.path:
 from analyze_earnings_trades import analyze_stock, normalize_timing  # noqa: E402
 
 from bot import fetch_cache  # noqa: E402
+from bot.signals import earnings_from_signals  # noqa: E402
 from bot.levels import (  # noqa: E402
     compute_levels, detect_low_break, detect_new_breaks, detect_sl_break,
     infer_bmo, positive_reaction)
@@ -176,10 +177,13 @@ class SymbolNotCovered(Exception):
     ก็ได้ 402 เหมือนกัน จึงแยกสองเคสนี้จากกันไม่ได้"""
 
 
-def lookup_symbol(client, symbol, universe, today=None, fallback_prices_fn=None):
+def lookup_symbol(client, symbol, universe, today=None, fallback_prices_fn=None,
+                  known_earnings_fn=earnings_from_signals):
     """ดึงข้อมูลหุ้นหนึ่งตัวแล้วประกอบ snapshot (None = ไม่พบข้อมูล)
 
     fallback_prices_fn(symbol, days) → แท่งราคาแหล่งสำรอง ใช้เมื่อ FMP ตอบ 402
+    known_earnings_fn(symbol) → วันงบที่บอทรู้อยู่แล้ว (signals.json) ใช้เมื่อ FMP
+    รายตัวไม่ให้ (402/ว่าง) — ไม่ cache ค่าสำรอง ให้ FMP ที่กลับมาใช้ได้ชนะในรอบถัดไป
     raise SymbolNotCovered ถ้าแผน FMP ไม่ครอบคลุมและแหล่งสำรองก็ไม่มีข้อมูล
     ราคา/วันงบผ่าน fetch_cache — job เช้าหลายตัวดึงหุ้นชุดเดียวกันไม่เปลืองงบซ้ำ
     """
@@ -200,5 +204,7 @@ def lookup_symbol(client, symbol, universe, today=None, fallback_prices_fn=None)
         fetch_cache.put(("prices", symbol, 250), prices)
     earnings = fetch_cache.cached(
         ("earnings", symbol), lambda: client.get_earnings_dates(symbol))
+    if not earnings and known_earnings_fn is not None:
+        earnings = known_earnings_fn(symbol)
     return build_snapshot(symbol, prices, meta=universe.get(symbol),
                           earnings=earnings, today=today)
