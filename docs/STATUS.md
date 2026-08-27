@@ -1,6 +1,6 @@
 # สถานะโปรเจค — US Earnings Screener Bot
 
-> อัปเดตล่าสุด: 2026-08-24 (รอบสิบสี่: ปฏิทินงบล่วงหน้า + dr ราคาสด)
+> อัปเดตล่าสุด: 2026-08-27 (รอบสิบห้า: แก้บั๊ก 4 จุดจากรีวิวทั้งโปรเจค)
 
 ## โปรเจคนี้คืออะไร
 
@@ -43,6 +43,7 @@ Telegram bot (`@Sakuro_usbot`) คัดกรองหุ้น US "อาก�
 
 | ปฏิทินงบล่วงหน้า + dr ราคาสด (24 ส.ค. รอบสิบสี่) | (1) พิมพ์ `งบ` = หุ้น universe ที่จะออกงบวันนี้+2 วันข้างหน้า / `งบ 5` (สูงสุด 7) / `งบวันนี้` — `bot/calendar_preview.py`: FMP earnings calendar 1 call + NASDAQ เสริม timing (merge/canon แบบ run_scan), cache 60 นาที, `format_calendar` จัดกลุ่มรายวัน → BMO/AMC/ไม่ระบุ, ticker ติดป้าย 🇹🇭 (มี DR) / 📌 (ใน watchlist), รายชื่อยาวตัดแถวละ 10 ตัว + แบ่งข้อความตาม MAX_LEN, ทุกวันในช่วงแสดงเสมอแม้ "ไม่มี" (2) `dr NVDA` ใช้ **quote สด** จาก Yahoo (fetch_yahoo_quote ได้พารามิเตอร์ `raw=True` ไม่แปลงจุด — รองรับ `.BK`/`=X`) ทั้งราคา DR และ USDTHB ไม่ cache · `compute_premium` รับ dr_quote/fx_quote ทับ close แท่งล่าสุด (baseline รายวันเดิม) + field ใหม่ live/day_pct/fx_live, format_dr โชว์ `(สด · วันนี้ ±x%)` แทนวันที่แท่ง · quote ล้ม fallback EOD เดิม · smoke จริงผ่าน (ปฏิทิน 12 ตัว, NVDA80 สด +0.7%) |
 | ปุ่ม inline ติดตาม/เลิกติดตาม (21 ส.ค. รอบสิบสาม) | `bot/buttons.py` ใหม่ — กดจากข้อความได้เลยไม่ต้องพิมพ์: lookup รายตัวมีปุ่ม ➕/📌 (หลาย ticker ≥2 → แถว "ติดตามทั้ง N ตัว" บนข้อความแรกที่สำเร็จ กดทีเดียวทั้งชุด) · ข้อความสแกนสุดท้ายมีปุ่ม "📌 ติดตามถาวรทั้งหมด (ชื่อ)" + ปุ่มใต้กราฟ candidate รายตัว · พิมพ์ `ติดตาม` → ปุ่ม 🗑 รายตัว (3 ปุ่ม/แถว) กดเอาออกต่อเนื่องได้ ปุ่มที่กดหายทีละปุ่ม · callback data `w:`/`wa:`/`u:` จำกัด 64 bytes + validate ticker, ปุ่มกดแล้วปลดชนวนเป็น `-` · `on_button`: **ทำงานจริงก่อนค่อย answer/edit** (query ค้างช่วงบอทปิด answer ล้มได้ งานไม่สูญ), answer เสมอกันปุ่มหมุนค้าง, edit บนข้อความ >48 ชม. (InaccessibleMessage) ล้มเงียบ, auth จาก `from_user.id` (ไม่ใช้ effective_chat ที่เป็น None ได้) · refactor `watchlist.remove_everywhere` ใช้ร่วมพิมพ์+ปุ่ม · tests 355 |
+| แก้บั๊ก 4 จุดจากรีวิว (27 ส.ค. รอบสิบห้า) | รีวิวทั้งโปรเจคแล้วแก้: (1) **คะแนนไม่สนทิศทาง** — `gap_size_calculator` ให้คะแนน `abs(gap)` และอีก 4 factor ไม่บังคับตอบรับบวก → หุ้น gap ลง -9% ในขาขึ้นคำนวณได้เกรด B; เพิ่ม `levels.reaction_pct` (ปิด D0 เทียบปิดวันก่อน) + `levels.positive_reaction()` แล้วให้ `run_scan` ตัดก่อนให้เกรด นับแยก `skipped_counts["down"]` (ข้อความ "ตอบรับลบ=N"), lookup ไม่ให้เกรดตัวที่ปิดลบ (formatter บอก "ตอบรับลบ x% — ไม่เข้าเกณฑ์"), candidate โชว์ "ปิดวันงบ +x%" (2) **งบ AMC ศุกร์/ก่อนวันหยุด US หลุดสแกนถาวร** — D0 = จันทร์ แท่งมาอังคารเช้า แต่ปฏิทินสแกนอังคาร (lookback 2 วัน) เริ่มอาทิตย์ → entry หาย; `bot/pending.py` จำ entry ที่ยังรอ (waiting/no_data — ไม่จำ not_in_plan) ลง `pending.json` (gitignored) แล้ว `run_scan` เติมกลับเข้า reported ทุกรอบ (ปฏิทินรอบนี้ชนะเรื่อง symbol ซ้ำ, timing `bmo*` ล้างเป็น unknown, หมดอายุ 10 วันหลังวันงบ); `run_scan` รับ `today`/`pending_path` (เทส) · `tests/conftest.py` แยก pending ไป tmp ทุกเทส (3) **restart loop ชน instance lock** — เดิม `SystemExit(str)` = code 1 เหมือน crash → `run_bot.bat` วนทุก 60 วิ (21 ส.ค. ERROR 230 บรรทัด/1.5 ชม.); ตอนนี้ `EXIT_ALREADY_RUNNING = 3` และ bat เห็น code 3 แล้ว `exit /b` ไม่วน (4) **error FMP หายกับ stderr** — บอทรันผ่าน .vbs ไม่มี console; `fmp_client.py` เปลี่ยน `print` 6 จุดเป็น logger `bot.fmp` (402 = INFO, ล้มจริง/timeout/429 = WARNING, ยอมแพ้ 429 = ERROR, endpoint สำรอง quiet = DEBUG) URL/params ไม่มี key จึง log ได้ · tests 397 |
 
 ## 🔧 บั๊กที่เจอและแก้แล้วระหว่างทาง
 
@@ -82,3 +83,5 @@ Telegram bot (`@Sakuro_usbot`) คัดกรองหุ้น US "อาก�
 - "ความถี่ทำไฮใหม่" = จำนวนวันใน 10 วันล่าสุดที่ close > max High ของ 63 วันก่อนหน้าวันนั้น
 - Push อังคาร–เสาร์ 08:30 Asia/Bangkok (เช็ค weekday ใน callback เอง ไม่พึ่ง days param ของ JobQueue)
 - Vendor โค้ด scoring แทน import ข้าม path → โปรเจค self-contained
+- Candidate ต้องปิดวันตอบรับงบเป็นบวก (`levels.positive_reaction`) ก่อนให้เกรด — 5-factor ให้คะแนน |gap| ไม่สนทิศ; ตัวที่ปิดลบนับ `skipped["down"]` ไม่ปนกับ C/D และ lookup ก็ไม่ให้เกรด (0% หรือไม่มีแท่งก่อน D0 = ไม่ผ่าน)
+- รายการรอตอบรับ (waiting/no_data) จำใน `pending.json` ข้ามรอบสแกน หมดอายุ 10 วันหลังวันงบ; not_in_plan (402) ไม่จำ · ข้อจำกัดที่รู้: budget FMP หมดกลางสแกน → entry ที่ยังไม่ถึงคิวไม่เข้า pending รอบนั้น (เกิดยาก: budget 200 vs ≤40 ตัว/วัน)

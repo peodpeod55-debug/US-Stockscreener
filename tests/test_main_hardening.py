@@ -12,6 +12,8 @@ import asyncio
 import datetime as dt
 import logging
 from logging.handlers import RotatingFileHandler
+
+import pytest
 from types import SimpleNamespace
 
 from telegram import Chat, Message, MessageEntity, Update
@@ -114,3 +116,18 @@ def test_setup_logging_rotates_and_quiets_noisy_libs(tmp_path):
     finally:
         logging.getLogger().removeHandler(handler)
         handler.close()
+
+
+# ── instance ซ้อน: exit code เฉพาะ ให้ run_bot.bat เลิกวน ────────
+
+def test_main_exits_with_distinct_code_when_lock_held(monkeypatch):
+    """เดิม SystemExit(str) = code 1 เหมือน crash → run_bot.bat วน restart ทุก 60 วิ
+    ไม่รู้จบ (21 ส.ค. ERROR 230 บรรทัดใน 1.5 ชม.) — ต้องเป็น code 3 และจบก่อนอ่าน config"""
+    import bot.main as m
+    monkeypatch.setattr(m, "setup_logging", lambda: None)
+    monkeypatch.setattr(m.instance_lock, "acquire", lambda: None)
+    monkeypatch.setattr(m, "load_config",
+                        lambda: pytest.fail("ต้องจบก่อน load_config"))
+    with pytest.raises(SystemExit) as exc:
+        m.main()
+    assert exc.value.code == m.EXIT_ALREADY_RUNNING == 3

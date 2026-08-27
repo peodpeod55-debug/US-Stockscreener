@@ -93,6 +93,7 @@ def setup_logging(path=LOG_PATH):
 
 
 CHART_MAX = 6                   # เพดานรูปต่อหนึ่งรอบแจ้ง กันสแปม
+EXIT_ALREADY_RUNNING = 3        # exit code เฉพาะ instance ซ้อน — run_bot.bat เห็นแล้วเลิกวน restart
 
 
 def _authorized(update: Update) -> bool:
@@ -738,7 +739,8 @@ def main():
     if lock is None:
         logger.error("bot.main รันอยู่แล้วอีก instance (port %d ถูกถือ) — จบตัวนี้",
                      instance_lock.LOCK_PORT)
-        raise SystemExit("bot.main กำลังรันอยู่แล้ว — กัน getUpdates Conflict")
+        # ห้ามเป็น code 1 (= crash) — launcher จะวน restart ทุก 60 วิไม่รู้จบ
+        raise SystemExit(EXIT_ALREADY_RUNNING)
     global CONFIG
     CONFIG = load_config()
     app = build_app(CONFIG)

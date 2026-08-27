@@ -73,6 +73,17 @@ def below_low_5d(levels):
     return price < low
 
 
+def positive_reaction(levels):
+    """วันตอบรับงบปิดสูงกว่าวันก่อนหน้าไหม — เกณฑ์ทิศทางของ "อาการหลังงบดี"
+
+    5-factor ให้คะแนน |gap| ไม่สนทิศ: หุ้น gap ลง -9% ที่เทรนด์ก่อนงบดี/ยืนเหนือ MA
+    คำนวณได้เกรด B → ต้องกรองทิศทางแยกก่อนให้เกรด (ใช้ทั้ง screener + lookup)
+    None (ไม่มีแท่งก่อน D0) หรือ 0% = ไม่ผ่าน
+    """
+    pct = (levels or {}).get("reaction_pct")
+    return pct is not None and pct > 0
+
+
 INFER_GAP_PCT = 3.0        # |gap เปิด| ขั้นต่ำ (%) เทียบปิดวันก่อน
 INFER_VOL_RATIO = 2.0      # วอลุ่มวันงบขั้นต่ำ เทียบเฉลี่ยก่อนวันงบ
 _INFER_MIN_VOL_BARS = 10   # ฐานวอลุ่มขั้นต่ำ — น้อยกว่านี้ค่าเฉลี่ยเชื่อไม่ได้
@@ -143,6 +154,10 @@ def compute_levels(daily_prices, earnings_date, timing):
     sl = daily_prices[d0]["low"]
     sl_pct = round((price - sl) / price * 100, 2) if price else None
 
+    # ทิศทางการตอบรับ: ปิด D0 เทียบปิดวันก่อนหน้า (บวก = "อาการหลังงบดี")
+    pre_close = daily_prices[d0 + 1]["close"] if d0 + 1 < len(daily_prices) else None
+    reaction_pct = _pct_vs(daily_prices[d0]["close"], pre_close)
+
     vols = [b["volume"] for b in pre[:20]]
     avg20 = sum(vols) / len(vols) if vols else 0
     vol_ratio = round(daily_prices[d0]["volume"] / avg20, 2) if avg20 else None
@@ -159,6 +174,7 @@ def compute_levels(daily_prices, earnings_date, timing):
         "prev_week_high": prev_week_high,
         "broke_prev_week_high": (price > prev_week_high) if prev_week_high else None,
         "new_high_count_10d": new_high_count,
+        "reaction_pct": reaction_pct,
         "sl": sl,
         "sl_pct": sl_pct,
         "vol_ratio": vol_ratio,

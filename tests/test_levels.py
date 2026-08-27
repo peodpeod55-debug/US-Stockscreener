@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from bot.levels import compute_levels
+from bot.levels import compute_levels, positive_reaction
 
 
 def make_prices(n=120, start_price=100.0):
@@ -68,3 +68,18 @@ def test_prev_week_high_present():
     # 2026-08-19 คือวันพุธ → สัปดาห์ก่อน = 10–14 ส.ค.
     assert lv["prev_week_high"] is not None
     assert isinstance(lv["broke_prev_week_high"], bool)
+
+
+def test_compute_levels_reaction_pct_and_direction():
+    """reaction_pct = ปิด D0 เทียบปิดวันก่อน · positive_reaction ใช้กรองทิศทาง"""
+    bars = make_prices()
+    lv = compute_levels(bars, bars[3]["date"], "amc")    # D0 = index 2
+    assert lv["reaction_pct"] == round((96 - 94) / 94 * 100, 2)
+    assert positive_reaction(lv) is True
+    bars[2]["close"] = 90.0                               # ปิด D0 ต่ำกว่าวันก่อน
+    lv = compute_levels(bars, bars[3]["date"], "amc")
+    assert lv["reaction_pct"] < 0
+    assert positive_reaction(lv) is False
+    assert positive_reaction(None) is False
+    assert positive_reaction({"reaction_pct": None}) is False
+    assert positive_reaction({"reaction_pct": 0.0}) is False

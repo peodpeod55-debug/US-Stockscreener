@@ -8,3 +8,4 @@ __pycache__/
 bot.log
 .pytest_cache/
 *.tmp
+pending.json

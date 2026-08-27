@@ -17,7 +17,7 @@ from analyze_earnings_trades import analyze_stock, normalize_timing  # noqa: E40
 from bot import fetch_cache  # noqa: E402
 from bot.levels import (  # noqa: E402
     compute_levels, detect_low_break, detect_new_breaks, detect_sl_break,
-    infer_bmo)
+    infer_bmo, positive_reaction)
 
 LOOKUP_MAX = 5                  # เพดานจำนวนหุ้นต่อหนึ่งข้อความ (คุมงบ API)
 RECENT_EARNINGS_DAYS = 60       # งบใหม่กว่านี้ (วันปฏิทิน) ถึงคำนวณสัญญาณหลังงบ
@@ -163,7 +163,8 @@ def build_snapshot(symbol, prices, meta=None, earnings=None, today=None):
             snap["new_breaks"] = detect_new_breaks(prices, levels)
             snap["sl_break"] = detect_sl_break(prices, levels)
             snap["low_break"] = detect_low_break(prices, levels)
-            if len(prices) >= MIN_BARS_FOR_SCORE:
+            # เกรดเฉพาะตอบรับบวก — เกณฑ์เดียวกับ screener (5-factor ไม่สนทิศ gap)
+            if len(prices) >= MIN_BARS_FOR_SCORE and positive_reaction(levels):
                 analysis = analyze_stock(prices, earn_bar_date, timing)
                 snap["score"] = analysis["composite"]["composite_score"]
                 snap["grade"] = analysis["composite"]["grade"]

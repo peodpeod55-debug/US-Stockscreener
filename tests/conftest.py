@@ -1,6 +1,12 @@
 import pytest
 
-from bot import fetch_cache
+from bot import fetch_cache, pending
+
+
+@pytest.fixture(autouse=True)
+def _isolate_pending(tmp_path, monkeypatch):
+    """pending.json เป็น state จริงของเครื่อง — run_scan ในเทสต์ต้องไม่เขียนทับ"""
+    monkeypatch.setattr(pending, "PENDING_PATH", tmp_path / "pending.json")
 
 
 @pytest.fixture(autouse=True)

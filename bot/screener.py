@@ -13,8 +13,8 @@ if str(ETA_DIR) not in sys.path:
 from analyze_earnings_trades import analyze_stock, normalize_timing  # noqa: E402
 from fmp_client import ApiCallBudgetExceeded, FMPClient  # noqa: E402
 
-from bot import fetch_cache  # noqa: E402
-from bot.levels import compute_levels, infer_bmo  # noqa: E402
+from bot import fetch_cache, pending as pending_store  # noqa: E402
+from bot.levels import compute_levels, infer_bmo, positive_reaction  # noqa: E402
 
 UNIVERSE_CSV = PROJECT_ROOT / "us_stock_list.csv"
 REPORTS_DIR = PROJECT_ROOT / "reports"
@@ -35,22 +35,26 @@ def load_universe(csv_path=UNIVERSE_CSV):
 
 
 def run_scan(config, lookback_days=None, client=None, secondary_cal_fn=None,
-             fallback_prices_fn=None):
+             fallback_prices_fn=None, today=None, pending_path=None):
     """สแกนหุ้นออกงบใน universe ให้คะแนน 5-factor + levels
 
     secondary_cal_fn(from_date, to_date) → ปฏิทินแหล่งที่สอง (รูปเดียวกับ FMP)
     ไว้เติมหุ้นที่แผนฟรี FMP กรองออกจากปฏิทินเงียบ ๆ — แหล่งเสริมล้มได้โดยไม่พังสแกน
     fallback_prices_fn(symbol, days) → แท่งราคาแหล่งสำรอง ใช้เฉพาะหุ้นที่ FMP ตอบ 402
+    today: datetime อ้างอิง (เทส) · pending_path: ไฟล์รายการรอตอบรับข้ามรอบ (bot/pending.py)
+
+    เกณฑ์ candidate: วันตอบรับงบต้องปิดบวก (positive_reaction) แล้วค่อยให้เกรด A/B —
+    5-factor ให้คะแนน |gap| ไม่สนทิศทาง ตัวที่ปิดลบนับใน skipped_counts["down"]
 
     คืน dict: from_date, to_date, universe_size, reported_symbols,
-    candidates (เกรด A/B เรียง score มาก→น้อย), skipped_counts, api_stats
+    candidates (เกรด A/B เรียง score มาก→น้อย), skipped_counts, pending, api_stats
     """
     lookback = lookback_days or config.lookback_days
     client = client or FMPClient(api_key=config.fmp_api_key,
                                  max_api_calls=config.max_api_calls)
     universe = load_universe()
 
-    today = datetime.now()
+    today = today or datetime.now()
     from_date = (today - timedelta(days=lookback)).strftime("%Y-%m-%d")
     to_date = today.strftime("%Y-%m-%d")
 
@@ -77,11 +81,14 @@ def run_scan(config, lookback_days=None, client=None, secondary_cal_fn=None,
         if sym in universe and sym not in seen:
             seen.add(sym)
             reported.append({"symbol": sym, "date": e.get("date"), "timing": t})
+    # entry ที่รอตอบรับจากรอบก่อนแต่หลุดหน้าต่างปฏิทินไปแล้ว (งบ AMC ศุกร์ / ก่อนวันหยุด US)
+    reported += pending_store.carry_forward(
+        reported, pending_store.load_pending(pending_path), today.date())
     for item in reported:
         if item["timing"] == "unknown":
             item["timing"] = timing_map.get(_canon(item["symbol"]), "unknown")
 
-    candidates, skipped, pending = [], {"C": 0, "D": 0}, []
+    candidates, skipped, pending = [], {"C": 0, "D": 0, "down": 0}, []
     for item in reported:
         sym = item["symbol"]
         prices = fetch_cache.get(("prices", sym, 250))
@@ -107,12 +114,16 @@ def run_scan(config, lookback_days=None, client=None, secondary_cal_fn=None,
         if timing == "unknown" and infer_bmo(prices, item["date"]):
             timing = "bmo"
             item["timing"] = "bmo*"  # อนุมานจากแท่งราคา ไม่ใช่ปฏิทิน — ไว้ audit
-        analysis = analyze_stock(prices, item["date"], timing)
         levels = compute_levels(prices, item["date"], timing)
         if levels is None:
             # วันตอบรับงบยังไม่มีในข้อมูล (งบวันนี้/เมื่อคืน) — รอสแกนรอบถัดไป
             pending.append({**item, "reason": "waiting"})
             continue
+        if not positive_reaction(levels):
+            # วันตอบรับปิดลบ = ไม่ใช่ "อาการหลังงบดี" ไม่ว่าคะแนนเท่าไร — ตัดก่อนให้เกรด
+            skipped["down"] += 1
+            continue
+        analysis = analyze_stock(prices, item["date"], timing)
         grade = analysis["composite"]["grade"]
         if grade in ("C", "D"):
             skipped[grade] += 1
@@ -130,6 +141,8 @@ def run_scan(config, lookback_days=None, client=None, secondary_cal_fn=None,
             "levels": levels,
         })
 
+    # จำตัวที่ยังรอ (waiting/no_data) ไว้เติมรอบหน้าแม้หลุดหน้าต่างปฏิทิน
+    pending_store.save_pending(pending, pending_path)
     candidates.sort(key=lambda c: c["score"], reverse=True)
     return {
         "from_date": from_date,

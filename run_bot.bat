@@ -2,6 +2,11 @@
 cd /d "%~dp0"
 :loop
 python -m bot.main
-echo bot exited with code %errorlevel%, restarting in 60s...
+set code=%errorlevel%
+if "%code%"=="3" (
+    echo another bot instance already holds the lock - this launcher exits
+    exit /b 3
+)
+echo bot exited with code %code%, restarting in 60s...
 timeout /t 60 /nobreak >nul
 goto loop

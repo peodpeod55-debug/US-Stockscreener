@@ -87,3 +87,15 @@ def test_split_long_messages():
     msgs = format_scan(base_scan(many))
     assert all(len(m) <= 3800 for m in msgs)
     assert len(msgs) >= 2
+
+
+def test_footer_counts_negative_reactions():
+    msgs = format_scan(base_scan([], skipped={"C": 2, "D": 1, "down": 3}))
+    assert "ตอบรับลบ=3" in msgs[0]
+
+
+def test_candidate_shows_reaction_day_change():
+    c = make_candidate()
+    c["levels"]["reaction_pct"] = 5.1
+    text = "\n".join(format_scan(base_scan([c])))
+    assert "ปิดวันงบ +5.1%" in text

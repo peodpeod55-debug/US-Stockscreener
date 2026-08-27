@@ -22,9 +22,11 @@ def _level_line(label, value, pct):
 def _format_candidate(c):
     lv = c["levels"]
     icon = GRADE_ICON.get(c["grade"], "⚪")
+    react = (f" · ปิดวันงบ {lv['reaction_pct']:+.1f}%"
+             if lv.get("reaction_pct") is not None else "")
     lines = [
         f"{icon} {c['symbol']} — {c['name']}   [เกรด {c['grade']} · {c['score']:.0f}/100]",
-        f"💰 ราคา: {lv['price']:,.2f}  (gap {c['gap_pct']:+.1f}%)",
+        f"💰 ราคา: {lv['price']:,.2f}  (gap {c['gap_pct']:+.1f}%{react})",
         "📈 " + _level_line("High 5 วันก่อนงบ", lv["high_5d"], lv["pct_vs_high_5d"]),
         "🏔️ " + _level_line("High 3 เดือนก่อนงบ", lv["high_3m"], lv["pct_vs_high_3m"]),
     ]
@@ -99,6 +101,9 @@ def format_lookup(s):
         head = "📌 สัญญาณหลังงบ"
         if s.get("grade"):
             head += f"   [เกรด {s['grade']} · {s['score']:.0f}/100]"
+        elif lv.get("reaction_pct") is not None and lv["reaction_pct"] <= 0:
+            # ไม่ให้เกรดเพราะทิศทาง ไม่ใช่เพราะคะแนน — บอกให้ชัด
+            head += f"   (ตอบรับลบ {lv['reaction_pct']:+.1f}% — ไม่เข้าเกณฑ์)"
         lines += [
             "", head,
             "📈 " + _level_line("High 5 วันก่อนงบ", lv["high_5d"], lv["pct_vs_high_5d"]),
@@ -445,7 +450,8 @@ def format_scan(scan):
         f"📊 Earnings Screener {scan['from_date']} → {scan['to_date']}\n"
         f"Universe {scan['universe_size']} ตัว · ออกงบ {len(scan['reported_symbols'])} ตัว"
     )
-    footer = f"ตกเกณฑ์: C={skipped['C']}, D={skipped['D']}"
+    footer = (f"ตกเกณฑ์: C={skipped['C']}, D={skipped['D']}, "
+              f"ตอบรับลบ={skipped.get('down', 0)}")
     pending = scan.get("pending") or []
     blocked = [p for p in pending if p.get("reason") == "not_in_plan"]
     waiting = [p for p in pending if p.get("reason") != "not_in_plan"]

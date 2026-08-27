@@ -12,8 +12,11 @@ Features:
 - API call budget enforcement
 - Batch profile support
 - Earnings calendar fetching
+- Diagnostics via the "bot.fmp" logger (never stderr: the bot runs headless
+  through start_bot_hidden.vbs, so anything printed is simply lost)
 """
 
+import logging
 import os
 import sys
 import time
@@ -24,6 +27,10 @@ try:
 except ImportError:
     print("ERROR: requests library not found. Install with: pip install requests", file=sys.stderr)
     sys.exit(1)
+
+# URL/params never carry the API key (it travels in the "apikey" header),
+# so both are safe to include in log lines.
+logger = logging.getLogger("bot.fmp")
 
 
 # --- FMP endpoint fallback: stable (new users) -> v3 (legacy users) ---
@@ -130,27 +137,30 @@ class FMPClient:
             elif response.status_code == 429:
                 self.retry_count += 1
                 if self.retry_count <= self.max_retries:
-                    print("WARNING: Rate limit exceeded. Waiting 60 seconds...", file=sys.stderr)
+                    logger.warning("FMP 429 rate limit - waiting 60s then retrying %s", url)
                     time.sleep(60)
                     return self._rate_limited_get(url, params, quiet=quiet)
                 else:
-                    print("ERROR: Daily API rate limit reached.", file=sys.stderr)
+                    logger.error("FMP 429 again - giving up for this client (daily limit?)")
                     self.rate_limit_reached = True
                     return None
             else:
                 if response.status_code == 402:
                     self.saw_402 = True
-                if not quiet:
-                    print(
-                        f"ERROR: API request failed: {response.status_code} - {response.text[:200]}",
-                        file=sys.stderr,
-                    )
+                    # expected on the free plan (symbol not covered): info, not a fault
+                    logger.info("FMP 402 not in plan: %s %s", url, params)
+                elif not quiet:
+                    logger.warning("FMP %s: %s %s - %s", response.status_code, url,
+                                   params, response.text[:200])
+                else:
+                    # fallback endpoint that is expected to fail (e.g. legacy 403)
+                    logger.debug("FMP %s (fallback endpoint): %s", response.status_code, url)
                 return None
         except requests.exceptions.Timeout:
-            print(f"WARNING: Request timed out for {url}", file=sys.stderr)
+            logger.warning("FMP timeout: %s %s", url, params)
             return None
         except requests.exceptions.RequestException as e:
-            print(f"ERROR: Request exception: {e}", file=sys.stderr)
+            logger.warning("FMP request error: %s (%s %s)", e, url, params)
             return None
 
     def _request_with_fallback(self, endpoint_key, symbols_str, extra_params=None):

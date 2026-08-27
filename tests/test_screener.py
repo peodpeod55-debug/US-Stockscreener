@@ -1,6 +1,7 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from bot import fetch_cache, pending as pending_mod
 from bot.config import Config
 from bot.screener import load_universe, run_scan
 
@@ -273,3 +274,77 @@ def test_run_scan_explicit_amc_not_overridden_by_inference():
                     secondary_cal_fn=lambda f, t: secondary)
     assert [(p["symbol"], p["reason"]) for p in scan["pending"]] == \
         [("AAPL", "waiting")]
+
+
+def _gap_down_bars():
+    """คู่ตรงข้ามของ _bmo_reaction_bars: gap ลง -6% ปิด -8% วอลุ่ม 4x"""
+    bars = _uptrend_prices()
+    prev_close = bars[1]["close"]
+    bars[0]["open"] = prev_close * 0.94
+    bars[0]["close"] = prev_close * 0.92
+    bars[0]["high"] = prev_close * 0.95
+    bars[0]["low"] = prev_close * 0.91
+    bars[0]["volume"] = 8_000_000
+    return bars
+
+
+def test_run_scan_negative_reaction_never_graded():
+    """5-factor ให้คะแนน |gap| — หุ้น gap ลงแรงในขาขึ้นคำนวณได้เกรด B แต่ไม่ใช่
+    "อาการหลังงบดี" → ต้องตกเป็น "ตอบรับลบ" ไม่ใช่ candidate และไม่ปนกับ C/D"""
+    bars = _gap_down_bars()
+    calendar = [{"symbol": "AAPL", "date": bars[0]["date"], "time": "bmo"}]
+    cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
+    scan = run_scan(cfg, lookback_days=3,
+                    client=FakeClient(calendar, {"AAPL": bars}))
+    assert scan["candidates"] == [] and scan["pending"] == []
+    assert scan["skipped_counts"] == {"C": 0, "D": 0, "down": 1}
+
+
+def test_run_scan_positive_twin_still_qualifies():
+    """gap ขึ้นชุดเดียวกันต้องยังได้เกรด — กรองแค่ทิศทาง ไม่ได้เข้มขึ้นอย่างอื่น"""
+    bars = _bmo_reaction_bars()
+    calendar = [{"symbol": "AAPL", "date": bars[0]["date"], "time": "bmo"}]
+    cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
+    scan = run_scan(cfg, lookback_days=3,
+                    client=FakeClient(calendar, {"AAPL": bars}))
+    assert len(scan["candidates"]) == 1
+    assert scan["candidates"][0]["levels"]["reaction_pct"] > 0
+    assert scan["skipped_counts"]["down"] == 0
+
+
+def test_run_scan_carries_pending_across_calendar_window():
+    """งบ AMC ศุกร์: รอบแรกยังไม่มีแท่งตอบรับ (waiting) → รอบถัดไป entry หลุด
+    หน้าต่างปฏิทินไปแล้ว แต่ต้องถูกเติมกลับจาก pending.json จนได้เกรด แล้วไฟล์ว่าง"""
+    bars1 = _uptrend_prices()                      # แท่งล่าสุด 2026-08-19
+    earn_date = bars1[0]["date"]
+    calendar = [{"symbol": "AAPL", "date": earn_date, "time": "amc"}]
+    cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
+    scan1 = run_scan(cfg, lookback_days=2, today=datetime(2026, 8, 20),
+                     client=FakeClient(calendar, {"AAPL": bars1}))
+    assert [(p["symbol"], p["reason"]) for p in scan1["pending"]] == \
+        [("AAPL", "waiting")]
+    assert pending_mod.load_pending() == \
+        [{"symbol": "AAPL", "date": earn_date, "timing": "amc"}]
+
+    fetch_cache.clear()                            # วันใหม่ cache ราคาหมดอายุแล้ว
+    prev = bars1[0]["close"]
+    bars2 = [{"date": "2026-08-20", "open": prev * 1.06, "high": prev * 1.09,
+              "low": prev * 1.05, "close": prev * 1.08,
+              "volume": 8_000_000}] + bars1
+    scan2 = run_scan(cfg, lookback_days=2, today=datetime(2026, 8, 21),
+                     client=FakeClient([], {"AAPL": bars2}))   # ปฏิทินไม่มีแล้ว
+    assert scan2["reported_symbols"] == ["AAPL"]
+    assert scan2["pending"] == []
+    assert len(scan2["candidates"]) + scan2["skipped_counts"]["C"] \
+        + scan2["skipped_counts"]["D"] == 1
+    assert pending_mod.load_pending() == []
+
+
+def test_run_scan_does_not_carry_plan_blocked():
+    """402 = นอกแผนถาวร รอไปก็ไม่ได้ผล — ต้องไม่ถูกจำ"""
+    bars = _uptrend_prices()
+    calendar = [{"symbol": "HD", "date": bars[2]["date"], "time": "amc"}]
+    cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
+    run_scan(cfg, lookback_days=3,
+             client=Fake402Client(calendar, {}, blocked={"HD"}))
+    assert pending_mod.load_pending() == []

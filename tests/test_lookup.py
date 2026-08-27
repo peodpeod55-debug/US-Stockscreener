@@ -344,3 +344,18 @@ def test_build_snapshot_quiet_unknown_still_waits():
     assert snap["timing"] == "unknown"
     assert snap["pending_reaction"] is True
     assert snap["levels"] is None
+
+
+def test_snapshot_negative_reaction_not_graded():
+    """วันตอบรับปิดลบ → มี levels (แนว/SL ยังมีประโยชน์) แต่ไม่ให้เกรด
+    (เกณฑ์เดียวกับ screener — 5-factor ให้คะแนน |gap| ไม่สนทิศ) + formatter บอกเหตุผล"""
+    bars = make_prices(120)
+    earn_date = bars[5]["date"]                    # AMC → D0 = index 4
+    bars[4].update({"open": 89.0, "high": 89.5, "low": 87.0, "close": 88.0})
+    s = build_snapshot("TEST", bars, earnings=[{"date": earn_date, "time": "amc"}],
+                       today=TODAY)
+    assert s["levels"] is not None
+    assert s["levels"]["reaction_pct"] < 0
+    assert s["grade"] is None and s["score"] is None
+    text = format_lookup(s)
+    assert "ตอบรับลบ" in text and "เกรด" not in text
