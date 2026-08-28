@@ -137,3 +137,15 @@ def test_since_pct_is_price_vs_close_before_d0():
     assert s["since_pct"] == s["ret_d0_pct"] == 12.24
     s = set_score(make_bars(post=_flat(3)), D0.isoformat())             # ปิดล่าสุด 104 เทียบ 98
     assert s["since_pct"] == 6.12 and s["price"] == 104.0
+
+
+def test_set_score_exposes_thai_detail_fields():
+    """ฟิลด์รายละเอียดแบบบอทไทย (pre5d_high/pre3m_high/new_high_days/post_days/weeks_observed/pct_above_pre_low) — ให้ lookup โชว์
+    ไม่กระทบ pts/CSV (เทสเดียวกับ HK 82efe6f)"""
+    bars = make_bars(post=[(113.0, 105.0, 111.0), (114.0, 106.0, 112.0), (113.0, 107.0, 111.0),
+                           (115.0, 108.0, 114.0), (116.0, 109.0, 115.0)])
+    s = set_score(bars, D0.isoformat())
+    assert s["pre5d_high"] == 100.0 and s["pre3m_high"] == 100.0
+    assert s["post_days"] == 5 and s["new_high_days"] == 4 and s["new_high_ratio"] == 0.8   # 113 114 _ 115 116
+    assert s["weeks_observed"] == 2 and s["weekly_hh_streak"] == 1                          # จ 3 ส.ค. + 5 วันทำการ → ข้าม ISO week
+    assert s["pre_low"] == 95.0 and round(s["pct_above_pre_low"], 1) == 21.1                # 115 เทียบ 95

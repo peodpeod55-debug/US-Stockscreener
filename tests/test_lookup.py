@@ -3,6 +3,7 @@ from datetime import date, timedelta
 from bot.formatter import format_lookup
 from bot.lookup import (
     LOOKUP_MAX,
+    SET_RULE,
     build_snapshot,
     lookup_symbol,
     parse_tickers,
@@ -343,3 +344,109 @@ def test_snapshot_negative_reaction_not_graded():
     assert s["grade"] is None and s["score"] is None
     text = format_lookup(s)
     assert "ตอบรับลบ" in text and "เกรด" not in text
+
+
+# ── เกณฑ์ SET ใน snapshot (คะแนน 0-15 ⭐ แบบบอทไทย — bot.set_score, สูตรไม่แตะ) ──
+
+def _d0_pop(bars, close=99.0, high=101.0, low=95.0, volume=3_000_000):
+    """งบ AMC ที่ bars[5] → D0 = bars[4]: ปิด +10% (90 → 99) · vol 3× ฐาน 1M · หลังจากนั้น 94/96/98/100 ตามซีรีส์"""
+    bars[4] = {**bars[4], "close": close, "high": high, "low": low, "volume": volume}
+    return bars
+
+
+def _amc_at(bars, i=5):
+    return [{"date": bars[i]["date"], "time": "amc"}]
+
+
+def test_snapshot_set_score_for_recent_earnings():
+    bars = _d0_pop(make_prices(120))
+    s = build_snapshot("TEST", bars, earnings=_amc_at(bars), today=TODAY)
+    st = s["set"]
+    # ปฏิกิริยา +10%/3× = 4 · H5d 1 + H3m 3 · ไฮใหม่วันล่าสุด 2 · ความถี่ยังวัดไม่ได้ (4 วัน) · สัปดาห์ไม่ยก · เหนือ low 1 = 11
+    assert st["pts"] == 11 and st["stars"] == "⭐⭐" and st["post_days"] == 4
+    assert st["ret_d0_pct"] == 10.0 and st["vol_ratio"] == 3.0 and st["hit"] is True
+    assert st["turnover_d0"] == 99.0 * 3_000_000
+    assert st["pre5d_high"] == 91.0 and st["pre_low"] == 81.0 and st["weeks_observed"] == 2
+    assert s["set_rule"] == SET_RULE == {"min_ret_pct": 2.0, "min_vol_ratio": 1.5}
+
+
+def test_snapshot_set_gate_miss_keeps_score():
+    """ปิด +2.2% แต่ vol 1.0× → ตกด่านเข้า (hit False) แต่คะแนนยังโชว์เหมือน lookup ของบอทไทย"""
+    bars = make_prices(120)
+    s = build_snapshot("TEST", bars, earnings=_amc_at(bars), today=TODAY)
+    st = s["set"]
+    assert st["hit"] is False and round(st["ret_d0_pct"], 2) == 2.22 and st["vol_ratio"] == 1.0
+    assert st["pts"] == 8 and st["stars"] == "⭐"       # H5d 1 + H3m 3 + ไฮใหม่สด 2 + สัปดาห์↑1 1 + เหนือ low 1
+    assert st["weekly_hh_streak"] == 1 and st["above_pre_low"] is True
+
+
+def test_snapshot_set_none_without_levels():
+    assert build_snapshot("TEST", flat_prices(30), earnings=None, today=TODAY)["set"] is None
+    bars = make_prices(250)
+    old = build_snapshot("TEST", bars, earnings=[{"date": bars[80]["date"]}], today=TODAY)
+    assert old["levels"] is None and old["set"] is None and old["set_rule"] is None
+    bars = make_prices(120)
+    pending = build_snapshot("TEST", bars, earnings=_amc_at(bars, 0), today=TODAY)
+    assert pending["pending_reaction"] and pending["set"] is None
+
+
+# ── format_lookup: บล็อก 🇹🇭 เกณฑ์ SET (หน้าตาเดียวกับบอทไทย / HK) ─────────
+
+def _set_block(**over):
+    s = {"pts": 11, "stars": "⭐⭐", "ret_d0_pct": 5.9, "vol_ratio": 4.77, "since_pct": 8.17, "price": 316.83,
+         "broke_5d": True, "broke_3m": True, "days_since_new_high": 0, "new_high_ratio": None, "new_high_days": 2,
+         "post_days": 3, "weekly_hh_streak": 0, "weeks_observed": 1, "pre_low": 302.5, "above_pre_low": True,
+         "pct_above_pre_low": 4.74, "pre5d_high": 310.2, "pre3m_high": 325.0, "hit": True, "turnover_d0": 2.0e9}
+    s.update(over)
+    return s
+
+
+def test_format_lookup_set_block_thai_style():
+    msg = format_lookup(make_snapshot(reaction_pct=5.9, set=_set_block(), set_rule=SET_RULE))
+    assert "วันตอบรับงบ: +5.9% (วอลุ่ม 4.8x 🔥)" in msg
+    assert "🇹🇭 เกณฑ์ SET   [⭐⭐ 11/15 · D+3 · ผ่านด่านเข้า ✅]" in msg
+    assert "• ไฮ 5 วันก่อนงบ: 310.20  ✅ ผ่านแล้ว" in msg and "• ไฮ 3 ด. ก่อนงบ: 325.00  ✅ ทะลุแล้ว" in msg
+    assert "• ไฮใหม่ล่าสุด: วันนี้ 🔥" in msg
+    assert "• ความถี่ไฮใหม่: ยังวัดไม่ได้ (มี 3 วันหลังงบ ต้อง ≥5)" in msg
+    assert "ไฮรายสัปดาห์" not in msg                                    # weeks_observed < 2 → ไม่โชว์ (เหมือนบอทไทย)
+    assert "• Low ก่อนงบ: 302.50  ✅ ยังเหนือ (+4.7%)" in msg
+    assert msg.index("📌 สัญญาณหลังงบ") < msg.index("🇹🇭 เกณฑ์ SET") < msg.index("📅 High/Low 5 วัน")
+
+
+def test_format_lookup_set_block_continuity_and_miss():
+    st = _set_block(pts=4, stars="", ret_d0_pct=1.2, vol_ratio=1.1, broke_5d=False, broke_3m=False,
+                    days_since_new_high=3, new_high_ratio=0.4, new_high_days=4, post_days=10,
+                    weekly_hh_streak=2, weeks_observed=3, above_pre_low=False, pct_above_pre_low=-2.1, hit=False)
+    msg = format_lookup(make_snapshot(reaction_pct=1.2, set=st, set_rule=SET_RULE))
+    assert "วันตอบรับงบ: +1.2% (วอลุ่ม 1.1x)" in msg
+    assert "🇹🇭 เกณฑ์ SET   [4/15 · D+10 · ด่านเข้า ✗ ปิด < +2%]" in msg
+    assert "• ไฮ 5 วันก่อนงบ: 310.20  ยังไม่ผ่าน" in msg and "• ไฮ 3 ด. ก่อนงบ: 325.00  ยังไม่ผ่าน" in msg
+    assert "• ไฮใหม่ล่าสุด: 3 วันทำการก่อน" in msg
+    assert "• ความถี่ไฮใหม่: 4/10 วันหลังงบ (40%)" in msg
+    assert "• ไฮรายสัปดาห์: ยกขึ้น 2 สัปดาห์ติด 🔥" in msg
+    assert "• Low ก่อนงบ: 302.50  ⛔ หลุดแล้ว (-2.1%)" in msg
+    no_streak = format_lookup(make_snapshot(set=_set_block(weekly_hh_streak=0, weeks_observed=2), set_rule=SET_RULE))
+    assert "• ไฮรายสัปดาห์: สัปดาห์นี้ยังไม่ยกขึ้น" in no_streak
+    vol_miss = format_lookup(make_snapshot(set=_set_block(ret_d0_pct=3.0, vol_ratio=1.1, hit=False), set_rule=SET_RULE))
+    assert "ด่านเข้า ✗ vol < 1.5×" in vol_miss
+
+
+def test_format_lookup_set_block_after_signals_before_highs():
+    msg = format_lookup(make_snapshot(set=_set_block(), set_rule=SET_RULE))
+    i_sig, i_set, i_hi = msg.index("📌 สัญญาณหลังงบ"), msg.index("🇹🇭 เกณฑ์ SET"), msg.index("📅 High/Low 5 วัน")
+    assert i_sig < msg.index("🛑 SL") < i_set < i_hi
+
+
+def test_format_lookup_without_set_block():
+    msg = format_lookup(make_snapshot())
+    assert "เกณฑ์ SET" not in msg and "วันตอบรับงบ: +5.1%" in msg
+    assert "เกณฑ์ SET" not in format_lookup(make_snapshot(set=None, set_rule=None))
+
+
+def test_format_lookup_sl_line_when_price_below_sl():
+    """ราคาต่ำกว่า SL → sl_pct ติดลบ — เดิมพิมพ์ "(--4.07%)" """
+    s = make_snapshot()
+    s["levels"] = {**s["levels"], "sl": 320.0, "sl_pct": -4.07}
+    msg = format_lookup(s)
+    assert "🛑 SL (low วันงบ): 320.00  (⛔ ต่ำกว่า SL 4.07%)" in msg and "--" not in msg
+    assert "🛑 SL (low วันงบ): 302.50  (-4.5%)" in format_lookup(make_snapshot())

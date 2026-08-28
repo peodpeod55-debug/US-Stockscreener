@@ -38,7 +38,7 @@ def _format_candidate(c):
         lines.append(f"🗓️ High สัปดาห์ก่อน: {lv['prev_week_high']:,.2f}  {mark}")
     lines.append(f"🔁 ทำไฮใหม่ 3M: {lv['new_high_count_10d']} ครั้งใน 10 วันล่าสุด")
     if lv["sl"] is not None:
-        lines.append(f"🛑 SL (low วันงบ): {lv['sl']:,.2f}  (-{lv['sl_pct']}%)")
+        lines.append(f"🛑 SL (low วันงบ): {lv['sl']:,.2f}  {_sl_pct_text(lv['sl_pct'])}")
     d0 = _d0_line(lv)
     if d0:
         lines.append(d0)
@@ -52,6 +52,14 @@ def _format_candidate(c):
 
 def _signed(x):
     return "n/a" if x is None else f"{x:+.1f}%"
+
+
+def _sl_pct_text(sl_pct, digits=None):
+    """"(-9.8%)" = SL อยู่ต่ำกว่าราคาเท่านี้ · ราคาหลุด SL แล้ว (sl_pct < 0) → "(⛔ ต่ำกว่า SL 4.07%)" ไม่ใช่ "(--4.07%)" """
+    if sl_pct is None:
+        return ""
+    v = abs(sl_pct) if digits is None else f"{abs(sl_pct):.{digits}f}"
+    return f"(-{v}%)" if sl_pct >= 0 else f"(⛔ ต่ำกว่า SL {v}%)"
 
 
 def _d0_line(lv):
@@ -76,8 +84,44 @@ def _fmt_volume(v):
     return f"{v:.0f}"
 
 
+def _set_vol_text(st):
+    """" (วอลุ่ม 4.8x 🔥)" ต่อท้ายบรรทัดวันตอบรับงบ — vol D0 จาก set_score (🔥 ≥2× เกณฑ์เดียวกับวอลุ่มวันล่าสุด)"""
+    if not st or st.get("vol_ratio") is None:
+        return ""
+    return f" (วอลุ่ม {st['vol_ratio']:.1f}x{' 🔥' if st['vol_ratio'] >= 2 else ''})"
+
+
+def _set_lookup_lines(s, rule):
+    """บล็อก 🇹🇭 เกณฑ์ SET ใน lookup — บรรทัดเดียวกับ "สัญญาณหลังงบ" ของบอทไทย (Set screnner telegram_bot.py) และ HK:
+    หัว [ดาว คะแนน/15 · D+N วันทำการหลัง D0 · ด่านเข้า] · ไฮ 5 วัน/3 ด. ก่อนงบ · ไฮใหม่ล่าสุด · ความถี่ไฮใหม่ (วัดเมื่อ ≥5 วัน) ·
+    ไฮรายสัปดาห์ (เมื่อเห็น ≥2 สัปดาห์) · Low ก่อนงบ — คะแนนคิดสดถึงแท่งล่าสุด (bot.set_score) โชว์แม้ตกด่านเข้า"""
+    gate = "ผ่านด่านเข้า ✅" if s.get("hit") else f"ด่านเข้า ✗ {_set_miss_text(s, rule)}"
+    dsh = s["days_since_new_high"]
+    dsh_txt = "วันนี้ 🔥" if dsh == 0 else f"{dsh} วันทำการก่อน"
+    lines = [
+        f"🇹🇭 เกณฑ์ SET   [{_set_pts_text(s['pts'])} · D+{s['post_days']} · {gate}]",
+        f"• ไฮ 5 วันก่อนงบ: {s['pre5d_high']:,.2f}  {'✅ ผ่านแล้ว' if s['broke_5d'] else 'ยังไม่ผ่าน'}",
+        f"• ไฮ 3 ด. ก่อนงบ: {s['pre3m_high']:,.2f}  {'✅ ทะลุแล้ว' if s['broke_3m'] else 'ยังไม่ผ่าน'}",
+        f"• ไฮใหม่ล่าสุด: {dsh_txt}",
+    ]
+    if s.get("new_high_ratio") is not None:
+        lines.append(f"• ความถี่ไฮใหม่: {s['new_high_days']}/{s['post_days']} วันหลังงบ "
+                     f"({s['new_high_ratio'] * 100:.0f}%)")
+    else:
+        lines.append(f"• ความถี่ไฮใหม่: ยังวัดไม่ได้ (มี {s['post_days']} วันหลังงบ ต้อง ≥5)")
+    if (s.get("weeks_observed") or 0) >= 2:
+        streak = s.get("weekly_hh_streak") or 0
+        streak_txt = (f"ยกขึ้น {streak} สัปดาห์ติด{' 🔥' if streak >= 2 else ''}" if streak
+                      else "สัปดาห์นี้ยังไม่ยกขึ้น")
+        lines.append(f"• ไฮรายสัปดาห์: {streak_txt}")
+    low_txt = "✅ ยังเหนือ" if s["above_pre_low"] else "⛔ หลุดแล้ว"
+    lines.append(f"• Low ก่อนงบ: {s['pre_low']:,.2f}  {low_txt} ({_signed(s.get('pct_above_pre_low'))})")
+    return lines
+
+
 def format_lookup(s):
-    """ข้อความ snapshot รายตัว (ผู้ใช้พิมพ์ ticker หาบอท) — plain text"""
+    """ข้อความ snapshot รายตัว (ผู้ใช้พิมพ์ ticker หาบอท) — plain text
+    มีงบ ≤60 วันที่มีแท่ง D0 → ต่อบล็อก 🇹🇭 เกณฑ์ SET (คะแนน 0-15 ⭐ แบบบอทไทย) ใต้ 📌 สัญญาณหลังงบ"""
     lines = [
         f"📊 {s['name']} ({s['symbol']})",
         f"🗓 ปิดล่าสุด {s['last_date']} (ข้อมูล EOD)",
@@ -104,7 +148,8 @@ def format_lookup(s):
                 line += f" → ตั้งแต่งบ {_signed(s['since_earnings_pct'])}"
             lines.append(line)
             if s["reaction_pct"] is not None:
-                lines.append(f"   วันตอบรับงบ: {_signed(s['reaction_pct'])}")
+                lines.append(f"   วันตอบรับงบ: {_signed(s['reaction_pct'])}"
+                             f"{_set_vol_text(s.get('set'))}")
         if s["next_earnings"]:
             lines.append(f"🗓 งบถัดไป: {s['next_earnings']} "
                          f"(อีก {s['days_to_earnings']} วัน)")
@@ -130,12 +175,14 @@ def format_lookup(s):
             lines.append(f"🗓️ High สัปดาห์ก่อน: {lv['prev_week_high']:,.2f}  {mark}")
         lines.append(f"🔁 ทำไฮใหม่ 3M: {lv['new_high_count_10d']} ครั้งใน 10 วันล่าสุด")
         if lv["sl"] is not None:
-            lines.append(f"🛑 SL (low วันงบ): {lv['sl']:,.2f}  (-{lv['sl_pct']}%)")
+            lines.append(f"🛑 SL (low วันงบ): {lv['sl']:,.2f}  {_sl_pct_text(lv['sl_pct'])}")
         d0 = _d0_line(lv)
         if d0:
             lines.append(d0)
         if s.get("gap_pullback"):
             lines.append("🔽 เพิ่งย่อเข้าโซน gap (แตะ D0 Open ยังเหนือ SL) — โซนเข้าแบบ pullback")
+    if s.get("set"):
+        lines += ["", *_set_lookup_lines(s["set"], s.get("set_rule"))]
 
     lines += [
         "",
@@ -259,7 +306,7 @@ def format_watch_detail(items, auto_dates=None):
             lines.append("   " + d0)
         tail = []
         if lv["sl"] is not None:
-            tail.append(f"SL {lv['sl']:,.2f} (-{lv['sl_pct']}%)")
+            tail.append(f"SL {lv['sl']:,.2f} {_sl_pct_text(lv['sl_pct'])}")
         if lv["low_5d"] is not None:
             mark = "🛑 หลุดแล้ว" if below_low_5d(lv) else "✅"
             tail.append(f"Low ก่อนงบ {lv['low_5d']:,.2f} {mark}")
@@ -431,9 +478,10 @@ def format_plan(plan, snap, hidden=0):
     head = f"📋 แผนเทรด {sym} — {snap.get('name') or sym}"
     if snap.get("grade"):
         head += f"   [เกรด {snap['grade']} · {snap['score']:.0f}/100]"
-    sl_pct = f" (-{plan['sl_pct']}%)" if plan.get("sl_pct") is not None else ""
+    sl_txt = _sl_pct_text(plan.get("sl_pct"))
     lines = [head,
-             f"💰 ปิดล่าสุด {price:,.2f} · 🛑 SL = D0 Low {plan['sl']:,.2f}{sl_pct}"]
+             f"💰 ปิดล่าสุด {price:,.2f} · 🛑 SL = D0 Low {plan['sl']:,.2f}"
+             f"{' ' + sl_txt if sl_txt else ''}"]
     lv = snap.get("levels") or {}
     if snap.get("last_earnings"):
         timing = (f" ({snap['timing'].upper()})"

@@ -12,6 +12,7 @@ High 5 วันก่อนงบ, High 3 เดือนก่อนงบ, Hi
 - **Catch-up**: เปิดเครื่องหลังเวลา job เช้า → บอทรันรอบที่พลาดชดเชยให้เอง (กันซ้ำด้วย `job_state.json`)
   · หุ้นที่ยังรอวันตอบรับ (เช่น งบ AMC วันศุกร์) จำไว้ใน `pending.json` แล้วเช็คต่อทุกรอบจนได้เกรด แม้หลุดหน้าต่างปฏิทิน 2 วันไปแล้ว
 - **สั่งเอง** (เมนู `/` ใน Telegram ลงทะเบียนเองตอนบอท start): `/scan` (ย้อนหลัง 2 วัน), `/scan 7`, `/hot` (หุ้นที่ติดตามตัวไหนน่าสนใจตอนนี้ — ใกล้ H5d/H3m ≤3%, เพิ่งทะลุ, งบ ≤3 วัน, หลุด SL/Low ก่อนงบ), `/watch [ticker]`, `/unwatch <ticker>`, `/cal [0-7]`, `/scanlog [N]` (หรือ `สแกนล็อก`: สองเกณฑ์คู่กัน — 🇹🇭 SET ปิด D0 ≥2% & vol ≥1.5× คะแนน 0–15 ⭐ คิดสด + เดิม A/B), `/dr <ticker>`, `/plan <ticker>` (หรือ `แผน CRM` / ปุ่ม 📋 ใต้ lookup และกราฟผลสแกน: แผนเทรด 3 ทางเข้า ① เข้าตอนนี้ ② ทะลุ High วันงบ ③ ย่อถึง D0 Open · SL = D0 Low · เป้า 1R/2R/3R · แปลงเป็นราคาบาท + จำนวนหน่วยต่อ DR ผ่าน implied ratio), `/risk 1% ทุน 500000` (หรือ `เสี่ยง ...`: ตั้งทุน/%เสี่ยงต่อไม้ให้แผนคิดจำนวนหน่วย — เก็บใน `settings.json` gitignored · `/risk` เฉย ๆ = ดูค่า), `/summary`, `/stats`, `/status` (รันอยู่ไหม/โค้ดตรง HEAD ไหม, job วันนี้, รอตอบรับ, FMP 402, error, สแกนล่าสุด), `/help` — คำสั่งไทยเดิม (`ติดตาม`, `น่าสนใจ`, `งบ`, `dr`, `แผน`, `เสี่ยง`, `สรุป`, `สถิติ`, `สถานะ`) ใช้ได้เหมือนเดิม
+- **พิมพ์ ticker** (เช่น `NVDA`, สูงสุด 5 ตัว): snapshot ราคา EOD + สัญญาณหลังงบ/เกรด + **🇹🇭 เกณฑ์ SET** คะแนน 0–15 ⭐ แบบบอทไทย (ไฮ 5 วัน/3 ด. ก่อนงบ ผ่านหรือยัง, ไฮใหม่ล่าสุด, ความถี่ไฮใหม่, ไฮรายสัปดาห์, Low ก่อนงบ — ตกด่านเข้า ≥2%/vol 1.5× ก็ยังโชว์คะแนน; สูตรเดียวกับ `/scanlog`/`scan_log.csv` และบอทไทย/HK) + กราฟ 6 เดือน + ปุ่ม ➕ ติดตาม / 📋 แผนเทรด
 - **`scan_log.csv` ให้ gem-lab** (28 ส.ค. 2026 — port จาก HK Stock Screener): ทั้ง `/scanlog` และ job สแกน 08:30 เขียนไฟล์นี้ (root, track ใน git) ใน **schema เดียวกับ `scan_log.csv` ของ Set screnner** + คอลัมน์ `grade` ท้ายสุด (`scan_date,ticker,earn_date,reaction_pct,reaction_vol_ratio,since_earn_pct,price,broke_5d_high,broke_3m_high,days_since_new_high,pre_earn_low,above_pre_low,score,grade`) · `ticker` = `NVDA` ไม่มีนามสกุล (gem-lab ต้องรู้ตลาดจาก config ของไฟล์) · `score` = คะแนน SET 0–15 (`bot/set_score.py` port `signal_score` ของไทยตัวต่อตัว) คิดสด ณ วันเขียน · แถว = ตัวที่ผ่านด่าน SET หรือเข้าเกณฑ์เดิม A/B · หนึ่งแถวต่อ (scan_date, ticker) รอบหลังทับรอบก่อน · utf-8-sig เปิด Excel ได้ · ไฟล์ถูกล็อก → log เตือน ไม่ล้มสแกน · ไม่แตะ signals.json/auto-watch · `run_scan` คืน `rows` (ทุกตัวที่มีแท่ง D0 รวม down/C/D พร้อม `set_hit`/`set_pts`) ให้ทั้งสองทางใช้
 
 ## ติดตั้งครั้งแรก
@@ -66,7 +67,15 @@ $lnk.Save()
 
 **ทางเลือก (ต้องรัน PowerShell แบบ Run as Administrator):** `.\setup_task.ps1` ใช้ Task Scheduler แทน
 
-หยุด bot ชั่วคราว: `Get-CimInstance Win32_Process -Filter "Name='python.exe'" | Where-Object { $_.CommandLine -like '*bot.main*' } | ForEach-Object { Stop-Process -Id $_.ProcessId }` (ระวัง run_bot.bat จะ restart ใน 60 วิ — ปิดหน้าต่าง cmd ของมันด้วยหรือลบ shortcut ออกจาก Startup)
+หยุด/restart bot — **หา PID จาก port ของ instance lock (48962) เท่านั้น** เพราะเครื่องนี้มีบอท HK Stock Screener รัน `python -m bot.main` คู่กัน (port 48972) filter `*bot.main*` จะฆ่าบอท HK ด้วย (เคยเกิด 25 ส.ค. 2026):
+
+```powershell
+$pid_ = (Get-NetTCPConnection -LocalPort 48962 -State Listen).OwningProcess
+(Get-CimInstance Win32_Process -Filter "ProcessId=$pid_").CommandLine   # ต้องเป็น python -m bot.main (parent = run_bot.bat ของโปรเจคนี้)
+Stop-Process -Id $pid_                                                  # run_bot.bat restart ให้ใน 60 วิ = โหลดโค้ดใหม่
+```
+
+หยุดจริง (ไม่ให้ฟื้น): ปิด cmd ที่เป็น parent ของ PID นั้นด้วย (`(Get-CimInstance Win32_Process -Filter "ProcessId=$pid_").ParentProcessId`) หรือลบ shortcut ออกจาก Startup · เช็คหลัง restart: port 48962 กลับมา + `bot.log` มี `bot starting` ไม่มี traceback · `/status` บอกว่าโค้ดตรง HEAD ไหม
 
 ## โครงสร้าง
 

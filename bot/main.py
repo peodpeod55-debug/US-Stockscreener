@@ -56,14 +56,13 @@ from bot.hot import classify_watch
 from bot.levels import below_low_5d
 from bot.jobstate import PUSH_WEEKDAYS, already_ran, claim, due_catchup, release
 from bot.openbell import build_open_report, fetch_quote, fetch_yahoo_quote, in_open_window
-from bot.lookup import LOOKUP_MAX, lookup_symbol, parse_tickers
+from bot.lookup import LOOKUP_MAX, SET_RULE, lookup_symbol, parse_tickers
 from bot.nasdaq_cal import fetch_nasdaq_earnings
 from bot.plan import (PLAN_MAX, build_plan, parse_plan_command,
                       plan_unavailable_reason, rank_drs)
 from bot.reminders import build_reminders
 from bot.scan_csv import live_scores, pick_rows, record_scan_csv
 from bot.screener import load_universe, run_scan, save_reports
-from bot.set_score import SET_MIN_RET_PCT, SET_MIN_VOL_RATIO
 from bot.settings import load_settings, parse_risk_command, risk_amount, update_settings
 from bot.signals import load_signals, record_signals, signals_since
 from bot.stats import build_stats, summarize
@@ -169,9 +168,6 @@ async def _do_scan_and_send(bot, chat_id, lookback):
                  "เอาออก: เลิกติดตาม <ticker>")
 
 
-SET_RULE = {"min_ret_pct": SET_MIN_RET_PCT, "min_vol_ratio": SET_MIN_VOL_RATIO}
-
-
 def _record_scan_csv(scan):
     """scan_log.csv (schema Set screnner + grade) ให้ gem-lab — แถวที่ผ่านด่าน SET หรือเกณฑ์เดิม
     คะแนน SET 0-15 จาก bars ใน fetch_cache ที่ run_scan เพิ่งดึง (ไม่ยิงเน็ตซ้ำ) · คืน (rows, scored) ให้ /scanlog ใช้ต่อ"""
@@ -252,6 +248,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"หลายตัวพร้อมกัน (สูงสุด {LOOKUP_MAX}): NVDA TSLA AAPL\n"
         "ได้ราคาปิดล่าสุด, %เปลี่ยน, วอลุ่ม, วันงบ,\n"
         "สัญญาณหลังงบ + เกรด, High/Low 5วัน/3ด./52w\n"
+        "+ 🇹🇭 เกณฑ์ SET คะแนน 0-15 ⭐ แบบบอทไทย (ไฮ 5d/3ด.,\n"
+        "ไฮใหม่ล่าสุด, ความถี่, สัปดาห์↑, Low ก่อนงบ — โชว์แม้ตกด่านเข้า)\n"
         "พร้อมกราฟ 6 เดือน (เส้นแนว + SL)\n\n"
         f"Watchlist (สูงสุด {WATCHLIST_MAX} ตัว):\n"
         "ติดตาม NVDA — เพิ่มหุ้นเข้า watchlist\n"

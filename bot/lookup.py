@@ -20,10 +20,14 @@ from bot.prices import get_prices  # noqa: E402
 from bot.levels import (  # noqa: E402
     compute_levels, detect_gap_pullback, detect_low_break, detect_new_breaks,
     detect_sl_break, infer_bmo, positive_reaction)
+from bot.set_score import SET_MIN_RET_PCT, SET_MIN_VOL_RATIO, is_set_hit, set_score  # noqa: E402
 
 LOOKUP_MAX = 5                  # เพดานจำนวนหุ้นต่อหนึ่งข้อความ (คุมงบ API)
 RECENT_EARNINGS_DAYS = 60       # งบใหม่กว่านี้ (วันปฏิทิน) ถึงคำนวณสัญญาณหลังงบ
 MIN_BARS_FOR_SCORE = 70         # เกณฑ์เดียวกับ screener.run_scan
+# ด่านเข้าเกณฑ์ SET ของ US: ปิด D0 ≥2% & vol ≥1.5× เท่านั้น (ไม่มีด่าน turnover — universe S&P500/DR สภาพคล่องพอ)
+# ใช้ร่วมกันใน lookup (snap["set_rule"]) และ /scanlog (bot.main)
+SET_RULE = {"min_ret_pct": SET_MIN_RET_PCT, "min_vol_ratio": SET_MIN_VOL_RATIO}
 
 _TICKER_RE = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
 
@@ -78,6 +82,8 @@ def build_snapshot(symbol, prices, meta=None, earnings=None, today=None):
     """ประกอบ snapshot จากแท่งราคา (pure function — ไม่ยิงเครือข่าย)
 
     meta: entry จาก universe (name/dr_symbols) · earnings: raw list จาก FMP
+    set / set_rule: เกณฑ์ SET (bot.set_score 0-15 ⭐ คิดสดถึงแท่งล่าสุด + hit = ด่านเข้า SET_RULE)
+    เฉพาะงบ ≤ RECENT_EARNINGS_DAYS ที่มีแท่ง D0 (เงื่อนไขเดียวกับ levels) · ไม่งั้น None
     คืน None ถ้าแท่งราคาไม่พอ
     """
     if not prices or len(prices) < 2:
@@ -123,6 +129,7 @@ def build_snapshot(symbol, prices, meta=None, earnings=None, today=None):
         "levels": None, "score": None, "grade": None,
         "pending_reaction": False, "new_breaks": [], "sl_break": False,
         "low_break": False, "gap_pullback": False,
+        "set": None, "set_rule": None,
     }
 
     if not earnings:
@@ -171,6 +178,14 @@ def build_snapshot(symbol, prices, meta=None, earnings=None, today=None):
                 analysis = analyze_stock(prices, earn_bar_date, timing)
                 snap["score"] = analysis["composite"]["composite_score"]
                 snap["grade"] = analysis["composite"]["grade"]
+            # เกณฑ์ SET คู่เกรดเดิม — คะแนนโชว์เสมอ (แม้ตกด่านเข้า) เหมือน lookup ของบอทไทย
+            ss = set_score(prices, levels["reaction_date"])
+            d0_idx = _index_on_or_before(prices, levels["reaction_date"])
+            if ss and d0_idx is not None:
+                tv = prices[d0_idx]["close"] * prices[d0_idx]["volume"]
+                snap["set"] = {**ss, "turnover_d0": tv,
+                               "hit": is_set_hit(ss["ret_d0_pct"], ss["vol_ratio"])}
+                snap["set_rule"] = SET_RULE
     return snap
 
 

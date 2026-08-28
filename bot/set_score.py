@@ -6,6 +6,7 @@
 
 ต่างจาก SET ที่ตั้งใจ: D0 (วันตอบรับ) รู้จาก timing bmo/amc ของปฏิทิน (bot.levels.compute_levels) ไม่ต้องเดา "วันไหน vol สูงกว่า"
 bars = list[dict] most-recent-first (คีย์ date/open/high/low/close/volume เหมือน bot.levels / bot.prices.get_prices)
+ใช้ที่: screener (set_hit/set_pts ทุกแถว) · /scanlog + scan_log.csv (คะแนนสด) · lookup รายตัว (bot.lookup.build_snapshot → snap["set"])
 """
 from datetime import date
 
@@ -93,6 +94,13 @@ def _post_signals(asc, start):
         "pre_low": pre_low,
         "above_pre_low": price > pre_low,
         "price": price,
+        # รายละเอียดแบบบอทไทย (telegram_bot "สัญญาณหลังงบ") — ให้ lookup โชว์ ไม่กระทบคะแนน (เหมือน HK 82efe6f)
+        "pre5d_high": pre5d_high,
+        "pre3m_high": pre3m_high,
+        "new_high_days": sum(later),
+        "post_days": post_days,
+        "weeks_observed": len(weekly),
+        "pct_above_pre_low": round((price / pre_low - 1) * 100, 2) if pre_low else None,
     }
 
 
