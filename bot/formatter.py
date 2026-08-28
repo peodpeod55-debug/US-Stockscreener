@@ -629,6 +629,138 @@ def format_status(st):
     return "\n".join(lines)[:MAX_LEN]
 
 
+# ── /scanlog — สองเกณฑ์คู่กัน: 🇹🇭 SET 0-15 (bot/set_score คิดสด) + เดิม A/B (port จาก HK Stock Screener 28 ส.ค. 2026) ──
+
+from bot.set_score import SET_MIN_RET_PCT, SET_MIN_VOL_RATIO, SET_SCORE_MAX  # noqa: E402
+from bot.set_score import stars as set_stars  # noqa: E402
+
+SKIP_TH = {"C": "เกรด", "D": "เกรด", "down": "ตอบรับลบ"}      # skip_reason ของ bot.screener.run_scan rows
+
+
+def _label(r):
+    return f"{r['symbol']} {r.get('name') or ''}".strip()
+
+
+def _x(vol_ratio):
+    return "n/a" if vol_ratio is None else f"{vol_ratio:.1f}x"
+
+
+def _orig_verdict(r):
+    """ผลเกณฑ์เดิมของแถวสแกน: "✅ B 74" · "❌ เกรด D 44" · "❌ ตอบรับลบ B 72" """
+    score = f"{r['score']:.0f}" if r.get("score") is not None else "n/a"
+    tail = f"{r.get('grade')} {score}"
+    reason = r.get("skip_reason")
+    return f"❌ {SKIP_TH.get(reason, reason)} {tail}" if reason else f"✅ {tail}"
+
+
+def _set_rule_text(rule):
+    rule = rule or {}
+    return (f"ปิด D0 ≥ +{rule.get('min_ret_pct', SET_MIN_RET_PCT):.0f}% & vol ≥ "
+            f"{rule.get('min_vol_ratio', SET_MIN_VOL_RATIO):.1f}×")
+
+
+def _set_pts_text(pts):
+    return "n/a" if pts is None else f"{set_stars(pts)} {pts}/{SET_SCORE_MAX}".strip()
+
+
+def _live_pts(r, scored):
+    s = (scored or {}).get(r.get("symbol"))
+    return s["pts"] if s else r.get("set_pts")
+
+
+def _set_rows(rows, scored=None):
+    hits = [r for r in rows if r.get("set_hit")]
+    return sorted(hits, key=lambda r: (_live_pts(r, scored) is None, -(_live_pts(r, scored) or 0),
+                                       -(r.get("ret_d0_pct") or 0)))
+
+
+def _set_detail(s):
+    parts = [f"H5d {'✓' if s['broke_5d'] else '✗'} H3m {'✓' if s['broke_3m'] else '✗'}",
+             f"ไฮใหม่ล่าสุด {s['days_since_new_high']} วัน"]
+    if s.get("new_high_ratio") is not None:
+        parts.append(f"ถี่ {s['new_high_ratio'] * 100:.0f}%")
+    if s.get("weekly_hh_streak"):
+        parts.append(f"สัปดาห์↑ {s['weekly_hh_streak']}")
+    parts.append(f"เหนือ low {'✓' if s['above_pre_low'] else '✗'}")
+    return " · ".join(parts)
+
+
+def _scanlog_set_line(r, s):
+    if s:
+        score, detail = _set_pts_text(s["pts"]), " · " + _set_detail(s)
+    else:
+        score = _set_pts_text(r.get("set_pts")) + (" (ณ วันสแกน)" if r.get("set_pts") is not None else "")
+        detail = ""
+    return (f"• {_label(r)} {score} · ปิด D0 {_signed(r.get('ret_d0_pct'))} · vol {_x(r.get('vol_ratio'))}{detail}"
+            f" · {r.get('d0') or 'n/a'} · เดิม: {_orig_verdict(r)}")
+
+
+def _set_miss_text(r, rule):
+    rule = rule or {}
+    min_ret = rule.get("min_ret_pct", SET_MIN_RET_PCT)
+    min_vol = rule.get("min_vol_ratio", SET_MIN_VOL_RATIO)
+    ret, vr = r.get("ret_d0_pct"), r.get("vol_ratio")
+    if ret is None or ret < min_ret:
+        return f"ปิด < +{min_ret:.0f}%"
+    if vr is None or vr < min_vol:
+        return f"vol < {min_vol:.1f}×"
+    return "ไม่ผ่าน"
+
+
+def _scanlog_orig_line(r, s, rule):
+    if r.get("set_hit"):
+        pts = s["pts"] if s else r.get("set_pts")
+        set_txt = _set_pts_text(pts) + ("" if s or pts is None else " (ณ วันสแกน)")
+    else:
+        set_txt = f"✗ {_set_miss_text(r, rule)}"
+    return (f"• {_label(r)} {_orig_verdict(r)} · ปิด D0 {_signed(r.get('ret_d0_pct'))} · vol {_x(r.get('vol_ratio'))}"
+            f" · {r.get('d0') or 'n/a'} · SET: {set_txt}")
+
+
+def _split_lines(text, limit=MAX_LEN):
+    """แบ่งข้อความยาวตามบรรทัด แต่ละฉบับ ≤ limit — ฉบับต่อขึ้นต้น "(ต่อ)" """
+    if len(text) <= limit:
+        return [text]
+    out, cur = [], ""
+    for line in text.split("\n"):
+        if cur and len(cur) + 1 + len(line) > limit:
+            out.append(cur)
+            cur = "🗂 (ต่อ)\n" + line
+        else:
+            cur = line if not cur else cur + "\n" + line
+    if cur:
+        out.append(cur)
+    return out
+
+
+def format_scanlog(rows, scored, from_date, to_date, rule):
+    """/scanlog — สองเกณฑ์คู่กันจากผลสแกนรอบนั้น: 🇹🇭 SET (คะแนนสดจาก scored[symbol] หรือ ณ วันสแกน) + 📊 เดิม (A/B)
+    แต่ละบรรทัดบอกผลอีกเกณฑ์ · แถวเดียวกันลง scan_log.csv ให้ gem-lab"""
+    span = f"{from_date} → {to_date}"
+    if not rows:
+        return [f"🗂 สองเกณฑ์คู่กัน {span}: ไม่มีตัวที่มีแท่งวันตอบรับในช่วงนี้"]
+    scored = scored or {}
+    set_rows = _set_rows(rows, scored)
+    orig_rows = sorted([r for r in rows if not r.get("skip_reason")], key=lambda r: -(r.get("score") or 0))
+    n_both = sum(1 for r in set_rows if not r.get("skip_reason"))
+    head = (f"🗂 สองเกณฑ์คู่กัน {span} · สแกน {len(rows)} ตัว · ทั้งสองเกณฑ์ {n_both}"
+            f" · เฉพาะ SET {len(set_rows) - n_both} · เฉพาะเดิม {len(orig_rows) - n_both}")
+    set_head = f"🇹🇭 เกณฑ์ SET ({_set_rule_text(rule)})"
+    if set_rows:
+        set_head += f" · {len(set_rows)} ตัว — คะแนน 0-15 ณ วันนี้ · เดิม = เกรด/คะแนน 0-100"
+        set_part = set_head + "\n" + "\n".join(_scanlog_set_line(r, scored.get(r["symbol"])) for r in set_rows)
+    else:
+        set_part = set_head + ": ไม่มีตัวผ่าน"
+    orig_head = "📊 เกณฑ์เดิม (A/B)"
+    if orig_rows:
+        orig_part = (orig_head + f" · {len(orig_rows)} ตัว\n"
+                     + "\n".join(_scanlog_orig_line(r, scored.get(r["symbol"]), rule) for r in orig_rows))
+    else:
+        orig_part = orig_head + ": ไม่มี"
+    text = head + "\n\n" + set_part + "\n\n" + orig_part + "\n\nบันทึก scan_log.csv แล้ว (schema ไทย + grade) — gem-lab อ่านต่อได้"
+    return _split_lines(text)
+
+
 # ── น่าสนใจตอนนี้ (/hot) ───────────────────────────────────────────
 
 _LEVEL_SHORT = {"high_5d": "H5d", "high_3m": "H3m", "d0_high": "High วันงบ"}

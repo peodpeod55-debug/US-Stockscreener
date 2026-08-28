@@ -17,6 +17,7 @@ from fmp_client import ApiCallBudgetExceeded, FMPClient  # noqa: E402
 from bot import earnings_store, fetch_cache, pending as pending_store  # noqa: E402
 from bot.levels import compute_levels, infer_bmo, positive_reaction  # noqa: E402
 from bot.prices import get_prices, prefetch  # noqa: E402
+from bot.set_score import is_set_hit, set_score  # noqa: E402
 
 UNIVERSE_CSV = PROJECT_ROOT / "us_stock_list.csv"
 REPORTS_DIR = PROJECT_ROOT / "reports"
@@ -96,7 +97,7 @@ def run_scan(config, lookback_days=None, client=None, secondary_cal_fn=None,
     # อุ่น cache ทุกตัวพร้อมกันก่อน (Yahoo หลัก) — ลูปข้างล่างอ่านจาก cache เป็นหลัก
     fetch = get_prices_fn or (lambda s, d: get_prices(s, d, client=client))
     prefetch([i["symbol"] for i in reported], 250, get_fn=fetch)
-    candidates, skipped, pending = [], {"C": 0, "D": 0, "down": 0}, []
+    candidates, skipped, pending, rows = [], {"C": 0, "D": 0, "down": 0}, [], []
     for item in reported:
         sym = item["symbol"]
         prices = fetch_cache.get(("prices", sym, 250))
@@ -122,15 +123,29 @@ def run_scan(config, lookback_days=None, client=None, secondary_cal_fn=None,
             # วันตอบรับงบยังไม่มีในข้อมูล (งบวันนี้/เมื่อคืน) — รอสแกนรอบถัดไป
             pending.append({**item, "reason": "waiting"})
             continue
+        # แถวต่อทุกตัวที่มีแท่ง D0 (แจ้ง + ตกเกณฑ์) — ฐานของ scan_log.csv / /scanlog · เกรดคิดให้ทุกแถวแม้ปิดลบ
+        # เกณฑ์ SET (bot/set_score, port จาก HK 28 ส.ค. 2026): ด่านเข้า ปิด D0 ≥2% & vol ≥1.5× · set_pts 0-15 ณ วันสแกน — ไม่กระทบตัวกรองเดิม
+        analysis = analyze_stock(prices, item["date"], timing)
+        grade = analysis["composite"]["grade"]
+        ss = set_score(prices, levels["reaction_date"])
+        row = {
+            "symbol": sym, "name": universe[sym]["name"], "earnings_date": item["date"], "timing": item["timing"],
+            "d0": levels["reaction_date"], "ret_d0_pct": levels.get("reaction_pct"), "vol_ratio": levels.get("vol_ratio"),
+            "score": analysis["composite"]["composite_score"], "grade": grade, "skip_reason": None, "signal_type": None,
+            "set_hit": is_set_hit(levels.get("reaction_pct"), levels.get("vol_ratio")),
+            "set_pts": ss["pts"] if ss else None,
+        }
+        rows.append(row)
         if not positive_reaction(levels):
             # วันตอบรับปิดลบ = ไม่ใช่ "อาการหลังงบดี" ไม่ว่าคะแนนเท่าไร — ตัดก่อนให้เกรด
             skipped["down"] += 1
+            row["skip_reason"] = "down"
             continue
-        analysis = analyze_stock(prices, item["date"], timing)
-        grade = analysis["composite"]["grade"]
         if grade in ("C", "D"):
             skipped[grade] += 1
+            row["skip_reason"] = grade
             continue
+        row["signal_type"] = "composite"
         candidates.append({
             "symbol": sym,
             "name": universe[sym]["name"],
@@ -155,6 +170,7 @@ def run_scan(config, lookback_days=None, client=None, secondary_cal_fn=None,
         "candidates": candidates,
         "skipped_counts": skipped,
         "pending": pending,
+        "rows": rows,
         "api_stats": client.get_api_stats(),
     }
 

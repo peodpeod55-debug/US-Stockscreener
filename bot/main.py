@@ -41,6 +41,7 @@ from bot.formatter import (
     format_open_report,
     format_reminders,
     format_scan,
+    format_scanlog,
     format_sl_breaks,
     format_stats,
     format_status,
@@ -54,7 +55,9 @@ from bot.openbell import build_open_report, fetch_quote, fetch_yahoo_quote, in_o
 from bot.lookup import LOOKUP_MAX, lookup_symbol, parse_tickers
 from bot.nasdaq_cal import fetch_nasdaq_earnings
 from bot.reminders import build_reminders
+from bot.scan_csv import live_scores, pick_rows, record_scan_csv
 from bot.screener import load_universe, run_scan, save_reports
+from bot.set_score import SET_MIN_RET_PCT, SET_MIN_VOL_RATIO
 from bot.signals import load_signals, record_signals, signals_since
 from bot.stats import build_stats, summarize
 from bot.status import build_status
@@ -131,6 +134,7 @@ async def _do_scan_and_send(bot, chat_id, lookback):
     save_reports(scan, messages)
     # บันทึกสัญญาณ A/B ลง signals.json (dedup ต่อรอบงบ) — ฐานของสรุปรายสัปดาห์
     record_signals(scan["candidates"], scan["to_date"])
+    _record_scan_csv(scan)                      # scan_log.csv (schema ไทย + grade) ให้ gem-lab
     # ปุ่มรวม "ติดตามถาวรทั้งหมด" ใต้ข้อความสแกนฉบับสุดท้าย (มี candidate ≥2)
     manual = set(load_watchlist())
     all_markup = build_watch_all_markup(
@@ -158,6 +162,52 @@ async def _do_scan_and_send(bot, chat_id, lookback):
                  "เอาออก: เลิกติดตาม <ticker>")
 
 
+SET_RULE = {"min_ret_pct": SET_MIN_RET_PCT, "min_vol_ratio": SET_MIN_VOL_RATIO}
+
+
+def _record_scan_csv(scan):
+    """scan_log.csv (schema Set screnner + grade) ให้ gem-lab — แถวที่ผ่านด่าน SET หรือเกณฑ์เดิม
+    คะแนน SET 0-15 จาก bars ใน fetch_cache ที่ run_scan เพิ่งดึง (ไม่ยิงเน็ตซ้ำ) · คืน (rows, scored) ให้ /scanlog ใช้ต่อ"""
+    rows = scan.get("rows") or []
+    picked = pick_rows(rows)
+    scored = live_scores(picked, lambda s: fetch_cache.get(("prices", s, 250)))
+    n = record_scan_csv([(r, scored.get(r["symbol"])) for r in picked], date.fromisoformat(scan["to_date"]))
+    logger.info("scan_log.csv: บันทึก %d แถว (%s)", n, scan["to_date"])
+    return rows, scored
+
+
+async def _scanlog(bot, chat_id, lookback):
+    """/scanlog · "สแกนล็อก" — สแกนย้อนหลัง N วันเหมือน /scan แต่โชว์สองเกณฑ์คู่กัน (🇹🇭 SET 0-15 + เดิม A/B)
+    ไม่แตะ signals/auto-watch/chart · แถวเดียวกันลง scan_log.csv"""
+    scan = await asyncio.to_thread(run_scan, CONFIG, lookback,
+                                   secondary_cal_fn=fetch_nasdaq_earnings)
+    rows, scored = _record_scan_csv(scan)
+    for msg in format_scanlog(rows, scored, scan["from_date"], scan["to_date"], SET_RULE):
+        await bot.send_message(chat_id=chat_id, text=msg)
+
+
+async def _run_scanlog(update, context, lookback):
+    await update.message.reply_text(f"🔍 กำลังสแกน + คิดคะแนน SET ย้อนหลัง {lookback} วัน...")
+    try:
+        await _scanlog(context.bot, update.effective_chat.id, lookback)
+    except Exception:
+        logger.exception("scanlog failed")
+        await update.message.reply_text("⚠️ scanlog ล้มเหลว ดูรายละเอียดใน bot.log")
+
+
+async def cmd_scanlog(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _authorized(update):
+        return
+    lookback = CONFIG.lookback_days
+    if context.args:
+        try:
+            lookback = max(1, min(30, int(context.args[0])))
+        except ValueError:
+            await update.message.reply_text("ใช้: /scanlog หรือ /scanlog <จำนวนวันย้อนหลัง 1-30>")
+            return
+    await _run_scanlog(update, context, lookback)
+
+
 async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not _authorized(update):
         return
@@ -183,6 +233,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "คำสั่ง:\n"
         "/scan — สแกนย้อนหลัง 2 วัน\n"
         "/scan 7 — สแกนย้อนหลัง 7 วัน\n"
+        "/scanlog (หรือพิมพ์ สแกนล็อก) — สองเกณฑ์คู่กัน: 🇹🇭 SET (ปิด D0 ≥2% & vol ≥1.5× · คะแนน 0-15 ⭐) + เดิม A/B\n"
+        "  แถวเดียวกันลง scan_log.csv (schema ไทย + grade) ให้ gem-lab · /scanlog 7\n"
         "/help — วิธีใช้\n"
         "/status (หรือพิมพ์ สถานะ) — สุขภาพบอท: รันอยู่ไหม/ต้อง restart ไหม,\n"
         "job วันนี้, รอตอบรับ, FMP 402, error, สแกนล่าสุด\n"
@@ -427,6 +479,13 @@ async def _dispatch_text(update, context, text):
         except Exception:
             logger.exception("stats failed")
             await update.message.reply_text("⚠️ สถิติล้มเหลว ดู bot.log")
+        return
+    words = text.strip().split()
+    if words and words[0].lower() in ("สแกนล็อก", "สองเกณฑ์", "scanlog"):
+        lookback = CONFIG.lookback_days
+        if len(words) > 1 and words[1].isdigit():
+            lookback = max(1, min(30, int(words[1])))
+        await _run_scanlog(update, context, lookback)
         return
     cal_cmd = parse_calendar_command(text)
     if cal_cmd is not None:
@@ -780,6 +839,7 @@ BOT_COMMANDS = [
     ("watch", "ดู watchlist + แนวรายตัว · /watch NVDA = ติดตาม"),
     ("unwatch", "เลิกติดตาม: /unwatch NVDA"),
     ("cal", "ปฏิทินงบ universe วันนี้+2 วัน (ใส่เลข 0-7)"),
+    ("scanlog", "สองเกณฑ์คู่กัน: 🇹🇭 SET (ปิด D0 ≥2% & vol ≥1.5× · 0-15 ⭐) + เดิม A/B → scan_log.csv (ใส่เลข = N วัน)"),
     ("dr", "DR ไทยแพง/ถูกกว่าหุ้นแม่แค่ไหน: /dr NVDA"),
     ("summary", "ผลหุ้นที่บอทแจ้งย้อนหลัง 30 วัน"),
     ("stats", "สถิติสะสมทุกสัญญาณ (win rate, drift, หลุด SL)"),
@@ -820,6 +880,7 @@ def build_app(config):
     new_msg = filters.UpdateType.MESSAGE
     app.add_handler(CommandHandler(["start", "help"], cmd_help, filters=new_msg))
     app.add_handler(CommandHandler("scan", cmd_scan, filters=new_msg))
+    app.add_handler(CommandHandler("scanlog", cmd_scanlog, filters=new_msg))
     app.add_handler(CommandHandler("status", cmd_status, filters=new_msg))
     app.add_handler(CommandHandler(list(SLASH_ALIASES), cmd_alias, filters=new_msg))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & new_msg, on_text))

@@ -50,7 +50,7 @@ def test_menu_entries_follow_telegram_limits():
 
 def test_menu_lists_core_commands_first():
     assert [c for c, _ in BOT_COMMANDS][:2] == ["scan", "hot"]
-    assert {"status", "help", "watch", "unwatch", "cal", "dr", "summary", "stats"} <= {
+    assert {"status", "help", "watch", "unwatch", "cal", "scanlog", "dr", "summary", "stats"} <= {
         c for c, _ in BOT_COMMANDS}
 
 
