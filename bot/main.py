@@ -34,6 +34,7 @@ from bot.formatter import (
     format_breakouts,
     format_calendar,
     format_dr,
+    format_gap_pullbacks,
     format_hot,
     format_lookup,
     format_low_breaks,
@@ -562,7 +563,7 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
                            max_api_calls=3 * len(symbols) + 2)
         universe = load_universe()
         auto = active_auto()
-        alerts, sl_alerts, low_alerts, dead = [], [], [], []
+        alerts, sl_alerts, low_alerts, pull_alerts, dead = [], [], [], [], []
         await asyncio.to_thread(prefetch, symbols, 250, client)  # ดึงขนานก่อน
         for sym in symbols:
             try:
@@ -576,6 +577,8 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
                 sl_alerts.append(snap)
             if snap and snap.get("low_break"):
                 low_alerts.append(snap)
+            if snap and snap.get("gap_pullback"):
+                pull_alerts.append(snap)
             # ปิดใต้ low ก่อนงบ = setup จบ → เก็บกวาดออกจาก auto-watch
             # (state ไม่ใช่ edge — ตัวที่หลุดค้างมาหลายวันก็โดนเก็บ) manual ไม่แตะ
             if snap and sym in auto and below_low_5d(snap.get("levels")):
@@ -583,11 +586,12 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
         removed = auto_remove(dead) if dead else []
         # เหตุการณ์ทะลุแนวลง breakouts.json — gem-lab อ่านไปเป็น candidate ยิง Gem
         record_breakouts(alerts)
-        for msg in (format_breakouts(alerts), format_sl_breaks(sl_alerts),
-                    format_low_breaks(low_alerts, removed)):
+        for msg in (format_breakouts(alerts), format_gap_pullbacks(pull_alerts),
+                    format_sl_breaks(sl_alerts), format_low_breaks(low_alerts, removed)):
             if msg:
                 await context.bot.send_message(chat_id=CONFIG.chat_id, text=msg)
         tagged = ([(s, "🚀 ทะลุแนว") for s in alerts]
+                  + [(s, "🔽 ย่อเข้า gap") for s in pull_alerts]
                   + [(s, "🛑 หลุด SL") for s in sl_alerts]
                   + [(s, "⛔ หลุด Low ก่อนงบ") for s in low_alerts])
         seen = set()

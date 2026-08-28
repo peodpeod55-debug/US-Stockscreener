@@ -65,13 +65,14 @@ def flat_prices(n=120):
 
 def test_snapshot_new_breaks_on_cross():
     bars = flat_prices(120)
-    # แนว high_5d/high_3m ก่อนงบ = 101 · เมื่อวานปิด 100 วันนี้ปิด 102 → เพิ่งทะลุ
+    # แนว high_5d/high_3m ก่อนงบ = 101 (และ High วันตอบรับงบ = 101 ในซีรีส์นิ่ง)
+    # เมื่อวานปิด 100 วันนี้ปิด 102 → เพิ่งทะลุทั้งสามแนว
     bars[0] = {**bars[0], "open": 100.5, "high": 102.5, "close": 102.0}
     earn_date = bars[5]["date"]
     s = build_snapshot("TEST", bars,
                        earnings=[{"date": earn_date, "time": "amc"}], today=TODAY)
     assert s["levels"] is not None
-    assert s["new_breaks"] == ["high_5d", "high_3m"]
+    assert s["new_breaks"] == ["high_5d", "high_3m", "d0_high"]
 
 
 def test_snapshot_new_breaks_empty_without_levels():

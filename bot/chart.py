@@ -18,7 +18,7 @@ CHART_BARS = 120                # ~6 เดือน เห็นฐาน 3M + 
 logger = logging.getLogger("bot.chart")
 
 _LEVEL_COLORS = (("high_5d", "#2e7d32"), ("high_3m", "#1565c0"),
-                 ("sl", "#c62828"), ("low_5d", "#ef6c00"))
+                 ("sl", "#c62828"), ("low_5d", "#ef6c00"), ("d0_high", "#6a1b9a"))
 
 
 def build_chart_png(symbol, prices, levels=None, last_n=CHART_BARS):

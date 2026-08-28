@@ -19,17 +19,38 @@ def _pct_vs(price, level):
     return round((price - level) / level * 100, 2)
 
 
+BREAK_LEVELS = ("high_5d", "high_3m", "d0_high")   # แนวที่นับ "เพิ่งทะลุ" (ลำดับคงที่)
+
+
 def detect_new_breaks(daily_prices, levels):
     """level ที่ "เพิ่งทะลุ": ปิดล่าสุดเหนือแนว แต่ปิดวันก่อนหน้ายังไม่เหนือ
 
-    คืน list จาก ("high_5d", "high_3m") — นิยามนี้กันเตือนซ้ำทุกวันที่ยืนเหนือแนว
+    คืน list จาก BREAK_LEVELS (H5d/H3m ก่อนงบ + High วันตอบรับงบ) — นิยามนี้กันเตือนซ้ำ
+    ทุกวันที่ยืนเหนือแนว
     """
     if not levels or not daily_prices or len(daily_prices) < 2:
         return []
     close = daily_prices[0]["close"]
     prev = daily_prices[1]["close"]
-    return [k for k in ("high_5d", "high_3m")
+    return [k for k in BREAK_LEVELS
             if levels.get(k) is not None and prev <= levels[k] < close]
+
+
+def detect_gap_pullback(daily_prices, levels):
+    """ราคา "เพิ่งย่อ" ลงมาแตะ D0 Open (ขอบบนของ gap วันตอบรับงบ) โดยยังไม่หลุด SL
+
+    โซนเข้าแบบ pullback ของ PEAD: low วันล่าสุด ≤ D0 Open แต่ low วันก่อนยังไม่ถึง
+    (self-dedup) · low หลุด SL หรือปิดใต้ SL = ไม่ใช่โอกาส (ไปเข้าเตือนหลุด SL แทน)
+    """
+    if not levels or not daily_prices or len(daily_prices) < 2:
+        return False
+    d0_open, sl = levels.get("d0_open"), levels.get("sl")
+    if d0_open is None or sl is None:
+        return False
+    last, prev = daily_prices[0], daily_prices[1]
+    if last["low"] < sl or last["close"] < sl:
+        return False
+    return last["low"] <= d0_open < prev["low"]
 
 
 def detect_sl_break(daily_prices, levels):
@@ -153,6 +174,8 @@ def compute_levels(daily_prices, earnings_date, timing):
 
     sl = daily_prices[d0]["low"]
     sl_pct = round((price - sl) / price * 100, 2) if price else None
+    # แนวของวันตอบรับงบเอง: High = trigger เข้าแบบ breakout · Open = ขอบบน gap (โซน pullback)
+    d0_high, d0_open = daily_prices[d0]["high"], daily_prices[d0]["open"]
 
     # ทิศทางการตอบรับ: ปิด D0 เทียบปิดวันก่อนหน้า (บวก = "อาการหลังงบดี")
     pre_close = daily_prices[d0 + 1]["close"] if d0 + 1 < len(daily_prices) else None
@@ -178,4 +201,7 @@ def compute_levels(daily_prices, earnings_date, timing):
         "sl": sl,
         "sl_pct": sl_pct,
         "vol_ratio": vol_ratio,
+        "d0_high": d0_high,
+        "pct_vs_d0_high": _pct_vs(price, d0_high),
+        "d0_open": d0_open,
     }

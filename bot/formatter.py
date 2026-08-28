@@ -37,6 +37,9 @@ def _format_candidate(c):
     lines.append(f"🔁 ทำไฮใหม่ 3M: {lv['new_high_count_10d']} ครั้งใน 10 วันล่าสุด")
     if lv["sl"] is not None:
         lines.append(f"🛑 SL (low วันงบ): {lv['sl']:,.2f}  (-{lv['sl_pct']}%)")
+    d0 = _d0_line(lv)
+    if d0:
+        lines.append(d0)
     if lv["vol_ratio"] is not None:
         lines.append(f"📊 Volume วันงบ: {lv['vol_ratio']}x avg 20d")
     if c["dr_symbols"]:
@@ -47,6 +50,16 @@ def _format_candidate(c):
 
 def _signed(x):
     return "n/a" if x is None else f"{x:+.1f}%"
+
+
+def _d0_line(lv):
+    """แนววันตอบรับงบ: "🎯 High วันงบ: 240.00 ⬆️ ห่างอีก 2.9% · Open 231.00" — None ถ้าไม่มี"""
+    if lv.get("d0_high") is None:
+        return None
+    line = "🎯 " + _level_line("High วันงบ", lv["d0_high"], lv.get("pct_vs_d0_high"))
+    if lv.get("d0_open") is not None:
+        line += f" · Open {lv['d0_open']:,.2f}"
+    return line
 
 
 def _fmt_volume(v):
@@ -116,6 +129,11 @@ def format_lookup(s):
         lines.append(f"🔁 ทำไฮใหม่ 3M: {lv['new_high_count_10d']} ครั้งใน 10 วันล่าสุด")
         if lv["sl"] is not None:
             lines.append(f"🛑 SL (low วันงบ): {lv['sl']:,.2f}  (-{lv['sl_pct']}%)")
+        d0 = _d0_line(lv)
+        if d0:
+            lines.append(d0)
+        if s.get("gap_pullback"):
+            lines.append("🔽 เพิ่งย่อเข้าโซน gap (แตะ D0 Open ยังเหนือ SL) — โซนเข้าแบบ pullback")
 
     lines += [
         "",
@@ -132,7 +150,8 @@ def format_lookup(s):
     return "\n".join(lines)
 
 
-_BREAK_TH = {"high_5d": "High 5 วันก่อนงบ", "high_3m": "High 3 เดือนก่อนงบ"}
+_BREAK_TH = {"high_5d": "High 5 วันก่อนงบ", "high_3m": "High 3 เดือนก่อนงบ",
+             "d0_high": "High วันงบ"}
 
 
 def format_breakouts(snaps):
@@ -168,6 +187,26 @@ def format_sl_breaks(snaps):
         lines.append(f"💰 ปิด {s['price']:,.2f} ({_signed(s['day_change_pct'])}) · "
                      f"low {s['low']:,.2f}")
         lines.append(f"🛑 ต่ำกว่า SL (low วันงบ): {s['levels']['sl']:,.2f}")
+        if s.get("dr_symbols"):
+            lines.append(f"🇹🇭 DR: {s['dr_symbols']}")
+    return "\n".join(lines)
+
+
+def format_gap_pullbacks(snaps):
+    """เตือนย่อเข้าโซน gap วันตอบรับงบ (แตะ D0 Open ยังไม่หลุด SL) — None ถ้าไม่มี"""
+    if not snaps:
+        return None
+    lines = ["🔽 ย่อเข้าโซน gap — โซนเข้าแบบ pullback (watchlist)"]
+    for s in snaps:
+        icon = GRADE_ICON.get(s.get("grade"), "⚪")
+        lv = s["levels"]
+        lines.append("")
+        lines.append(f"{icon} {s['symbol']} — {s['name']}")
+        lines.append(f"💰 ปิด {s['price']:,.2f} ({_signed(s['day_change_pct'])}) · "
+                     f"low {s['low']:,.2f}")
+        lines.append(f"🔽 แตะ D0 Open {lv['d0_open']:,.2f} · ยังเหนือ SL {lv['sl']:,.2f}")
+        if lv.get("d0_high") is not None:
+            lines.append(f"🎯 High วันงบ {lv['d0_high']:,.2f} = trigger แบบ breakout")
         if s.get("dr_symbols"):
             lines.append(f"🇹🇭 DR: {s['dr_symbols']}")
     return "\n".join(lines)
@@ -209,6 +248,13 @@ def format_watch_detail(items, auto_dates=None):
         lines = [head,
                  "   " + _compact_level("H5d", lv["high_5d"], lv["pct_vs_high_5d"])
                  + " · " + _compact_level("H3m", lv["high_3m"], lv["pct_vs_high_3m"])]
+        if lv.get("d0_high") is not None:
+            d0 = _compact_level("D0H", lv["d0_high"], lv.get("pct_vs_d0_high"))
+            if lv.get("d0_open") is not None:
+                d0 += f" · D0O {lv['d0_open']:,.2f}"
+            if s.get("gap_pullback"):
+                d0 += " 🔽 ย่อเข้า gap"
+            lines.append("   " + d0)
         tail = []
         if lv["sl"] is not None:
             tail.append(f"SL {lv['sl']:,.2f} (-{lv['sl_pct']}%)")
@@ -585,7 +631,7 @@ def format_status(st):
 
 # ── น่าสนใจตอนนี้ (/hot) ───────────────────────────────────────────
 
-_LEVEL_SHORT = {"high_5d": "H5d", "high_3m": "H3m"}
+_LEVEL_SHORT = {"high_5d": "H5d", "high_3m": "H3m", "d0_high": "High วันงบ"}
 HOT_VOL_NOTE_MIN = 2.0          # โชว์ "vol x.xx" เฉพาะวอลุ่มเด่น (≥ เท่านี้ของเฉลี่ย 20 วัน)
 
 

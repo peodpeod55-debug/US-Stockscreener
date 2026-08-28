@@ -18,8 +18,8 @@ from bot import fetch_cache  # noqa: E402
 from bot.earnings_store import known_earnings  # noqa: E402
 from bot.prices import get_prices  # noqa: E402
 from bot.levels import (  # noqa: E402
-    compute_levels, detect_low_break, detect_new_breaks, detect_sl_break,
-    infer_bmo, positive_reaction)
+    compute_levels, detect_gap_pullback, detect_low_break, detect_new_breaks,
+    detect_sl_break, infer_bmo, positive_reaction)
 
 LOOKUP_MAX = 5                  # เพดานจำนวนหุ้นต่อหนึ่งข้อความ (คุมงบ API)
 RECENT_EARNINGS_DAYS = 60       # งบใหม่กว่านี้ (วันปฏิทิน) ถึงคำนวณสัญญาณหลังงบ
@@ -122,7 +122,7 @@ def build_snapshot(symbol, prices, meta=None, earnings=None, today=None):
         "since_earnings_pct": None, "reaction_pct": None, "timing": "unknown",
         "levels": None, "score": None, "grade": None,
         "pending_reaction": False, "new_breaks": [], "sl_break": False,
-        "low_break": False,
+        "low_break": False, "gap_pullback": False,
     }
 
     if not earnings:
@@ -165,6 +165,7 @@ def build_snapshot(symbol, prices, meta=None, earnings=None, today=None):
             snap["new_breaks"] = detect_new_breaks(prices, levels)
             snap["sl_break"] = detect_sl_break(prices, levels)
             snap["low_break"] = detect_low_break(prices, levels)
+            snap["gap_pullback"] = detect_gap_pullback(prices, levels)
             # เกรดเฉพาะตอบรับบวก — เกณฑ์เดียวกับ screener (5-factor ไม่สนทิศ gap)
             if len(prices) >= MIN_BARS_FOR_SCORE and positive_reaction(levels):
                 analysis = analyze_stock(prices, earn_bar_date, timing)
