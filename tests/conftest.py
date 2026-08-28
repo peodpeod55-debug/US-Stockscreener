@@ -1,6 +1,6 @@
 import pytest
 
-from bot import fetch_cache, pending, prices, signals
+from bot import earnings_store, fetch_cache, pending, prices, signals
 
 
 @pytest.fixture(autouse=True)
@@ -21,6 +21,14 @@ def _isolate_pending(tmp_path, monkeypatch):
 def _isolate_signals(tmp_path, monkeypatch):
     """signals.json จริงมี EL/TGT — fallback วันงบใน lookup ต้องไม่เห็นในเทส (เทสตั้งไฟล์เองได้)"""
     monkeypatch.setattr(signals, "SIGNALS_PATH", tmp_path / "signals.json")
+
+
+@pytest.fixture(autouse=True)
+def _isolate_earnings_store(tmp_path, monkeypatch):
+    """earnings_calendar.json เป็นคลังจริงของเครื่อง — run_scan/build_calendar ในเทส merge ลงคลัง
+    ต้องไม่เขียนทับ และ lookup ต้องไม่เห็นวันงบจริง"""
+    monkeypatch.setattr(earnings_store, "STORE_PATH",
+                        tmp_path / "earnings_calendar.json")
 
 
 @pytest.fixture(autouse=True)

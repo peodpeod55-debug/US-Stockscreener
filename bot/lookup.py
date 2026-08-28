@@ -15,8 +15,8 @@ if str(ETA_DIR) not in sys.path:
 from analyze_earnings_trades import analyze_stock, normalize_timing  # noqa: E402
 
 from bot import fetch_cache  # noqa: E402
+from bot.earnings_store import known_earnings  # noqa: E402
 from bot.prices import get_prices  # noqa: E402
-from bot.signals import earnings_from_signals  # noqa: E402
 from bot.levels import (  # noqa: E402
     compute_levels, detect_low_break, detect_new_breaks, detect_sl_break,
     infer_bmo, positive_reaction)
@@ -174,13 +174,13 @@ def build_snapshot(symbol, prices, meta=None, earnings=None, today=None):
 
 
 def lookup_symbol(client, symbol, universe, today=None, get_prices_fn=None,
-                  known_earnings_fn=earnings_from_signals):
+                  known_earnings_fn=known_earnings):
     """ดึงข้อมูลหุ้นหนึ่งตัวแล้วประกอบ snapshot (None = ไม่พบข้อมูล/ไม่มีแหล่งราคา)
 
     get_prices_fn(symbol, days) → แท่งราคา (ค่าเริ่มต้น bot.prices.get_prices:
     cache → Yahoo → FMP สำรอง) · ticker ผิดหรือทุกแหล่งว่าง = None เหมือนกัน
-    known_earnings_fn(symbol) → วันงบที่บอทรู้อยู่แล้ว (signals.json) ใช้เมื่อ FMP
-    รายตัวไม่ให้ (402/ว่าง) — ไม่ cache ค่าสำรอง ให้ FMP ที่กลับมาใช้ได้ชนะในรอบถัดไป
+    known_earnings_fn(symbol) → วันงบที่บอทรู้เอง (คลัง earnings_calendar.json ∪ signals.json)
+    ใช้ก่อน — FMP รายตัว (402 เกือบทุกตัวในแผนฟรี + rate-limit) ยิงเฉพาะตอนไม่รู้อะไรเลย
     ราคา/วันงบผ่าน fetch_cache — job เช้าหลายตัวดึงหุ้นชุดเดียวกันไม่เปลืองงบซ้ำ
     """
     fetch = get_prices_fn or (lambda s, d: get_prices(s, d, client=client))
@@ -190,9 +190,9 @@ def lookup_symbol(client, symbol, universe, today=None, get_prices_fn=None,
         if not prices or len(prices) < 2:
             return None
         fetch_cache.put(("prices", symbol, 250), prices)
-    earnings = fetch_cache.cached(
-        ("earnings", symbol), lambda: client.get_earnings_dates(symbol))
-    if not earnings and known_earnings_fn is not None:
-        earnings = known_earnings_fn(symbol)
+    earnings = known_earnings_fn(symbol) if known_earnings_fn is not None else None
+    if not earnings:
+        earnings = fetch_cache.cached(
+            ("earnings", symbol), lambda: client.get_earnings_dates(symbol))
     return build_snapshot(symbol, prices, meta=universe.get(symbol),
                           earnings=earnings, today=today)

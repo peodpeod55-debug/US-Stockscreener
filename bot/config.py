@@ -15,6 +15,7 @@ class Config:
     fmp_api_key: str
     lookback_days: int = 2
     max_api_calls: int = 200
+    finnhub_api_key: str = ""      # ตัวเลือก: ปฏิทินงบ Finnhub (timing bmo/amc)
 
 
 def load_config(env_path: Path | None = None) -> Config:
@@ -30,4 +31,5 @@ def load_config(env_path: Path | None = None) -> Config:
         fmp_api_key=os.environ["FMP_API_KEY"],
         lookback_days=int(os.environ.get("SCAN_LOOKBACK_DAYS", "2")),
         max_api_calls=int(os.environ.get("MAX_API_CALLS", "200")),
+        finnhub_api_key=os.environ.get("FINNHUB_API_KEY", "").strip(),
     )

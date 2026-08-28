@@ -14,6 +14,8 @@ if str(ETA_DIR) not in sys.path:
 
 from analyze_earnings_trades import normalize_timing  # noqa: E402
 
+from bot import earnings_store  # noqa: E402
+
 DEFAULT_AHEAD = 2               # "งบ" เฉยๆ = วันนี้ + ล่วงหน้า 2 วัน
 MAX_AHEAD = 7                   # เพดานล่วงหน้า (ปฏิทินไกลกว่านี้ยังเปลี่ยนได้บ่อย)
 
@@ -43,10 +45,6 @@ def parse_calendar_command(text):
     return DEFAULT_AHEAD
 
 
-def _canon(s):
-    return s.replace("/", ".").replace("-", ".")
-
-
 def build_calendar(get_calendar, universe, today=None, days_ahead=DEFAULT_AHEAD,
                    secondary_cal_fn=None):
     """หุ้น universe ที่จะออกงบช่วง today..today+days_ahead
@@ -64,6 +62,9 @@ def build_calendar(get_calendar, universe, today=None, days_ahead=DEFAULT_AHEAD,
             calendar += secondary_cal_fn(from_date, to_date) or []
         except Exception:
             logger.exception("secondary calendar failed")
+    # ปฏิทินล่วงหน้าที่ดึงมาแล้ว → ลงคลังวันงบ (เตือนวันงบ/lookup ใช้ต่อ ฟรี)
+    earnings_store.merge(calendar, source="preview", today=today)
+    _canon = earnings_store.canon
     seen, items, timing_map = set(), [], {}
     for e in calendar:
         sym, d = e.get("symbol"), e.get("date")

@@ -14,7 +14,7 @@ if str(ETA_DIR) not in sys.path:
 from analyze_earnings_trades import analyze_stock, normalize_timing  # noqa: E402
 from fmp_client import ApiCallBudgetExceeded, FMPClient  # noqa: E402
 
-from bot import fetch_cache, pending as pending_store  # noqa: E402
+from bot import earnings_store, fetch_cache, pending as pending_store  # noqa: E402
 from bot.levels import compute_levels, infer_bmo, positive_reaction  # noqa: E402
 from bot.prices import get_prices, prefetch  # noqa: E402
 
@@ -69,10 +69,11 @@ def run_scan(config, lookback_days=None, client=None, secondary_cal_fn=None,
             calendar += secondary_cal_fn(from_date, to_date) or []
         except Exception:
             pass
+    # ทุกแถว (รวมนอก universe) ลงคลังวันงบ — lookup/เตือนวันงบใช้ต่อโดยไม่ยิง FMP รายตัว
+    earnings_store.merge(calendar, source="scan", today=today.date())
     # FMP stable ไม่มี field time เลย — เก็บ timing จากทุก entry (รวมตัวที่แพ้
     # dedup เช่น NASDAQ) ไว้เติมให้ตัวที่ยัง unknown; join แบบ normalize จุด/ทับ
-    def _canon(s):
-        return s.replace("/", ".").replace("-", ".")
+    _canon = earnings_store.canon
 
     seen, reported, timing_map = set(), [], {}
     for e in calendar:

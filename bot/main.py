@@ -58,6 +58,7 @@ from bot.signals import load_signals, record_signals, signals_since
 from bot.stats import build_stats, summarize
 from bot.status import build_status
 from bot.weekly import SIGNAL_LOOKBACK_DAYS, build_weekly_items
+from bot.earnings_store import default_sources, known_earnings, refresh
 from bot.prices import get_prices, prefetch
 from bot.yahoo_prices import fetch_yahoo_prices
 from bot.watchlist import (
@@ -484,6 +485,8 @@ async def _dispatch_text(update, context, text):
 
 
 JOB_MAX_TRIES = 3               # เพดานลอง/วัน ต่อ job (นับใน process) กันสแปม+เผางบ API
+REFRESH_AHEAD_DAYS = 7          # job เช้า: อัปเดตคลังวันงบล่วงหน้าเท่านี้ (NASDAQ ≤6 request)
+REFRESH_WEEKLY_DAYS = 35        # อาทิตย์: ดึงต่อถึงเท่านี้ (NASDAQ มีข้อมูล ~4 สัปดาห์)
 CATCHUP_INTERVAL = 30 * 60      # วินาที — catch-up วนเก็บ job ที่พลาด/ล้มทุกครึ่งชั่วโมง
 
 _fail_counts = {}               # (job, วัน ISO) -> จำนวนครั้งที่ล้มวันนี้
@@ -519,17 +522,23 @@ async def _run_claimed(context, name, work):
 
 
 async def reminder_job(context: ContextTypes.DEFAULT_TYPE):
-    """เช้าทุกวัน: เช็คหุ้นที่ติดตาม (manual + auto) ตัวไหนงบวันนี้/พรุ่งนี้"""
+    """เช้าทุกวัน: อัปเดตคลังวันงบล่วงหน้า 7 วัน แล้วเช็คหุ้นที่ติดตาม (manual + auto)
+    ตัวไหนงบวันนี้/พรุ่งนี้ — อ่านจากคลัง ไม่ยิง FMP รายตัว (402 เกือบทุกตัว)"""
     async def work():
         symbols = all_watched()
+        client = FMPClient(api_key=CONFIG.fmp_api_key,
+                           max_api_calls=len(symbols) + 4)
+        today = datetime.now(TZ).date()
+        await asyncio.to_thread(
+            refresh, default_sources(client, CONFIG.finnhub_api_key),
+            today.isoformat(),
+            (today + timedelta(days=REFRESH_AHEAD_DAYS)).isoformat(), today)
         if not symbols:
             return
-        client = FMPClient(api_key=CONFIG.fmp_api_key,
-                           max_api_calls=len(symbols) + 2)
 
         def get_earnings(sym):
-            # breakout_job 08:20 เพิ่ง cache วันงบหุ้นชุดเดียวกัน — ไม่ดึงซ้ำ
-            return fetch_cache.cached(
+            # คลัง ∪ signals.json ก่อน — FMP รายตัวเฉพาะตอนไม่รู้อะไรเลย (cache ข้าม job)
+            return known_earnings(sym) or fetch_cache.cached(
                 ("earnings", sym), lambda: client.get_earnings_dates(sym))
 
         items = await asyncio.to_thread(build_reminders, symbols, get_earnings)
@@ -669,11 +678,20 @@ async def _send_status(bot, chat_id):
 
 
 async def weekly_job(context: ContextTypes.DEFAULT_TYPE):
-    """อาทิตย์เช้า: สรุปว่าหุ้นที่บอทเคยแจ้ง ตอนนี้เป็นยังไงบ้าง"""
+    """อาทิตย์เช้า: ดึงคลังวันงบล่วงหน้าถึง +35 วัน แล้วสรุปว่าหุ้นที่บอทเคยแจ้งเป็นยังไงบ้าง"""
     if datetime.now(TZ).weekday() != 6:  # อาทิตย์
         return
-    await _run_claimed(context, "weekly",
-                       lambda: _send_weekly(context.bot, CONFIG.chat_id))
+
+    async def work():
+        today = datetime.now(TZ).date()
+        client = FMPClient(api_key=CONFIG.fmp_api_key, max_api_calls=4)
+        await asyncio.to_thread(
+            refresh, default_sources(client, CONFIG.finnhub_api_key),
+            (today + timedelta(days=REFRESH_AHEAD_DAYS + 1)).isoformat(),
+            (today + timedelta(days=REFRESH_WEEKLY_DAYS)).isoformat(), today)
+        await _send_weekly(context.bot, CONFIG.chat_id)
+
+    await _run_claimed(context, "weekly", work)
 
 
 async def daily_job(context: ContextTypes.DEFAULT_TYPE):

@@ -29,6 +29,18 @@ def test_load_config_tolerates_utf8_bom(tmp_path, monkeypatch):
     assert cfg.telegram_token == "tok123"
 
 
+def test_finnhub_key_is_optional(tmp_path, monkeypatch):
+    """FINNHUB_API_KEY ไม่บังคับ — ไม่มี = "" (บอทข้ามแหล่ง Finnhub เงียบ ๆ)"""
+    for k in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "FMP_API_KEY", "FINNHUB_API_KEY"):
+        monkeypatch.delenv(k, raising=False)
+    env = tmp_path / ".env"
+    env.write_text("TELEGRAM_BOT_TOKEN=tok\nTELEGRAM_CHAT_ID=1\nFMP_API_KEY=f\n")
+    assert load_config(env).finnhub_api_key == ""
+    env.write_text("TELEGRAM_BOT_TOKEN=tok\nTELEGRAM_CHAT_ID=1\nFMP_API_KEY=f\n"
+                   "FINNHUB_API_KEY=fh-key\n")
+    assert load_config(env).finnhub_api_key == "fh-key"
+
+
 def test_load_config_missing_raises(tmp_path, monkeypatch):
     for k in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "FMP_API_KEY"):
         monkeypatch.delenv(k, raising=False)

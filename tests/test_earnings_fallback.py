@@ -92,17 +92,42 @@ def test_lookup_uses_known_earnings_when_fmp_has_none():
     assert s["levels"] is not None and s["levels"]["sl"] is not None
 
 
-def test_lookup_prefers_fmp_earnings_over_fallback():
+def test_lookup_prefers_known_earnings_over_fmp():
+    """คลัง/signals รู้แล้ว → ไม่ยิง FMP รายตัว (402 เกือบทุกตัว + rate-limit ~0.7 วิ/ตัว)"""
     bars = make_prices(120)
-    calls = []
 
-    def known(sym):
-        calls.append(sym)
-        return [{"date": bars[20]["date"], "time": "amc"}]
+    class NoFMP(FakeClient):
+        def get_earnings_dates(self, symbol):
+            raise AssertionError("must not call FMP when earnings already known")
+
+    s = lookup_symbol(NoFMP(bars), "EL", {}, today=TODAY,
+                      known_earnings_fn=lambda sym: [{"date": bars[20]["date"], "time": "amc"}])
+    assert s["last_earnings"] == bars[20]["date"]
+
+
+def test_lookup_falls_back_to_fmp_when_nothing_known():
+    bars = make_prices(120)
     client = FakeClient(bars, [{"date": bars[5]["date"], "time": "amc"}])
-    s = lookup_symbol(client, "EL", {}, today=TODAY, known_earnings_fn=known)
+    s = lookup_symbol(client, "EL", {}, today=TODAY, known_earnings_fn=lambda sym: [])
     assert s["last_earnings"] == bars[5]["date"]
-    assert calls == []
+
+
+def test_default_known_source_includes_earnings_store():
+    """ค่าเริ่มต้น = earnings_store.known_earnings (คลัง ∪ signals.json)"""
+    from bot import earnings_store as es
+    bars = make_prices(120)
+    es.merge([{"symbol": "EL", "date": bars[5]["date"], "time": "bmo"},
+              {"symbol": "EL", "date": "2026-11-05", "time": None}],
+             source="nasdaq", today=TODAY)
+
+    class NoFMP(FakeClient):
+        def get_earnings_dates(self, symbol):
+            raise AssertionError("must not call FMP when store has the symbol")
+
+    s = lookup_symbol(NoFMP(bars), "EL", {}, today=TODAY)
+    assert s["last_earnings"] == bars[5]["date"]
+    assert s["timing"] == "bmo"
+    assert s["next_earnings"] == "2026-11-05"
 
 
 def test_fallback_result_is_not_cached_as_fmp_earnings():

@@ -290,13 +290,15 @@ class FMPClient:
         )
 
     def get_earnings_dates(self, symbol: str) -> Optional[list]:
-        """Fetch past + upcoming earnings dates for one symbol.
+        """Fetch past + upcoming earnings dates for one symbol (stable/earnings).
 
-        Tries stable/earnings first (new keys), falls back to
-        api/v3/historical/earning_calendar/{symbol} (legacy keys).
+        The legacy api/v3/historical/earning_calendar/{symbol} endpoint answers
+        403 "Legacy Endpoint" for every key issued after 2025-08-31, so it is
+        no longer tried (it only cost a rate-limit wait and a warning line).
 
         Returns:
-            List of dicts with at least a "date" key, or None on failure.
+            List of dicts with at least a "date" key, or None on failure
+            (including 402 = symbol not in the free plan; see saw_402).
         """
         cache_key = f"earnings_dates_{symbol}"
         if cache_key in self.cache:
@@ -305,10 +307,6 @@ class FMPClient:
         data = self._rate_limited_get(
             f"{self.STABLE_URL}/earnings", {"symbol": symbol}, quiet=True
         )
-        if not self._valid_earnings_rows(data):
-            data = self._rate_limited_get(
-                f"{self.BASE_URL}/historical/earning_calendar/{symbol}"
-            )
         if self._valid_earnings_rows(data):
             self.cache[cache_key] = data
             return data

@@ -174,6 +174,25 @@ def test_run_scan_merges_secondary_calendar():
     assert reasons.get("HD") == "no_data"
 
 
+def test_run_scan_records_calendar_rows_into_earnings_store():
+    """ทุกแถวปฏิทินที่สแกนดึง (FMP ไม่มี time + NASDAQ มี) ต้องลงคลังวันงบ — รวมตัวนอก universe"""
+    from bot import earnings_store as es
+    bars = _uptrend_prices()
+    earn_date = bars[2]["date"]
+    calendar = [{"symbol": "AAPL", "date": earn_date, "time": None}]
+    secondary = _cal_fn([{"symbol": "AAPL", "date": earn_date, "time": "amc"},
+                         {"symbol": "ZZZZ", "date": earn_date, "time": "bmo"}])
+    cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
+    run_scan(cfg, lookback_days=3, client=FakeClient(calendar, {"AAPL": bars}),
+             secondary_cal_fn=secondary, today=datetime(2026, 8, 20))
+    assert es.earnings_for("AAPL") == [{"date": earn_date, "time": "amc"}]
+    assert es.earnings_for("ZZZZ") == [{"date": earn_date, "time": "bmo"}]
+
+
+def _cal_fn(rows):
+    return lambda from_date, to_date: rows
+
+
 def test_run_scan_secondary_failure_does_not_break_scan():
     bars = _uptrend_prices()
     calendar = [{"symbol": "AAPL", "date": bars[2]["date"], "time": "amc"}]

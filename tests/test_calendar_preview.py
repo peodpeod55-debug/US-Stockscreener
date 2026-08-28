@@ -54,6 +54,16 @@ def test_parse_calendar_command_bad_arg_uses_default():
 
 # ── build_calendar ───────────────────────────────────────────────
 
+def test_build_calendar_records_rows_into_earnings_store():
+    """พิมพ์ "งบ" = ได้ปฏิทินล่วงหน้ามาแล้ว → เก็บลงคลังให้เตือนวันงบ/lookup ใช้ต่อ (ฟรี)"""
+    from bot import earnings_store as es
+    rows = [{"symbol": "NVDA", "date": "2026-08-25", "time": "amc"},
+            {"symbol": "ZZZZ", "date": "2026-08-26", "time": None}]   # นอก universe ก็เก็บ
+    build_calendar(_cal(rows), UNI, today=TODAY, days_ahead=2)
+    assert es.earnings_for("NVDA") == [{"date": "2026-08-25", "time": "amc"}]
+    assert es.earnings_for("ZZZZ") == [{"date": "2026-08-26", "time": None}]
+
+
 def test_build_calendar_filters_universe_and_range():
     rows = [
         {"symbol": "NVDA", "date": "2026-08-25", "time": "amc"},

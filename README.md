@@ -1,6 +1,6 @@
 # US Earnings Screener Bot — Telegram
 
-Bot คัดกรองหุ้น US "อาการหลังงบดี" จาก universe **หุ้นที่มี DR ไทย ∪ S&P 500** (~529 ตัว)
+Bot คัดกรองหุ้น US "อาการหลังงบดี" จาก universe **หุ้นที่มี DR ไทย ∪ S&P 500** (~566 ตัว)
 ให้คะแนนด้วยระบบ 5-factor (Gap 25% · Pre-Earnings Trend 30% · Volume 20% · MA200 15% · MA50 10%)
 แจ้งเฉพาะเกรด **A (≥85)** และ **B (70–84)** **ที่วันตอบรับงบปิดบวก** (5-factor ให้คะแนน |gap| ไม่สนทิศทาง —
 หุ้น gap ลงจึงถูกตัดก่อนให้เกรด นับแยกเป็น "ตอบรับลบ") พร้อมระดับราคาแบบ SET Earnings Breakout Screener เดิม:
@@ -34,7 +34,10 @@ pip install -r requirements.txt
    ```
    TELEGRAM_CHAT_ID=987654321
    ```
-5. ใส่ `FMP_API_KEY` (financialmodelingprep.com — free tier พอ)
+5. ใส่ `FMP_API_KEY` (financialmodelingprep.com — free tier พอ: ใช้แค่ปฏิทินงบรวม ราคาใช้ Yahoo)
+6. (ตัวเลือก) ใส่ `FINNHUB_API_KEY` (finnhub.io — สมัครฟรี) → เติมเวลางบ BMO/AMC ให้ปฏิทิน
+   ลดเคส "ไม่ระบุ" ที่ต้องอนุมานจากแท่งราคา ไม่ใส่บอทก็ทำงานครบ
+7. (ครั้งแรก) seed คลังวันงบย้อนหลัง: `python -m bot.earnings_store backfill 90` (NASDAQ ฟรี ไม่ต้อง key)
 
 ## รัน
 
@@ -70,6 +73,8 @@ $lnk.Save()
 bot/
 ├── main.py          entry: handlers + daily job
 ├── screener.py      universe → earnings calendar → score → levels
+├── prices.py        ราคา EOD: cache → Yahoo (หลัก) → FMP (สำรอง) + prefetch ขนาน
+├── earnings_store.py คลังวันงบสะสม earnings_calendar.json (NASDAQ/FMP/Finnhub) — อ่านก่อนยิง FMP รายตัว
 ├── levels.py        ระดับราคา (5d/3M/week high, new-high freq, SL)
 ├── formatter.py     ข้อความ Telegram ภาษาไทย
 ├── config.py        อ่าน .env
@@ -89,6 +94,9 @@ python -m pytest -q
 
 ## หมายเหตุ
 
-- ข้อมูลจาก FMP (EOD) — สแกนหลังตลาดปิด ไม่ใช่ realtime แบบ SET screener เดิม
-- API ที่ใช้ต่อรอบ ≈ 1 (ปฏิทินงบ) + 1 ต่อหุ้นที่ออกงบใน universe → free tier 250 calls/วัน เพียงพอ
+- ข้อมูล EOD — สแกนหลังตลาดปิด ไม่ใช่ realtime แบบ SET screener เดิม
+- **ราคา**: Yahoo (v8 chart, ไม่ต้อง key) เป็นหลักทุกตัว — FMP แผนฟรีตอบ 402 กับหุ้นเกือบทั้ง universe จึงเหลือเป็นสำรองตอน Yahoo ล้ม
+- **วันงบ**: ปฏิทินรวม FMP (1 call) + NASDAQ (ฟรี) + Finnhub (ถ้ามี key) ทุกแถวลง `earnings_calendar.json` (gitignored)
+  → เตือนวันงบ / `/hot` "งบใกล้" / lookup อ่านจากคลังก่อน ไม่ยิง FMP รายตัว (402) · job เช้าดึงล่วงหน้า 7 วัน, อาทิตย์ดึงถึง 35 วัน
+- API FMP ต่อวัน ≈ 2–3 call (ปฏิทิน) → free tier 250 calls/วัน เหลือเฟือ
 - Log อยู่ที่ `bot.log`

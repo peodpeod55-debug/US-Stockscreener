@@ -9,3 +9,4 @@ bot.log
 .pytest_cache/
 *.tmp
 pending.json
+earnings_calendar.json

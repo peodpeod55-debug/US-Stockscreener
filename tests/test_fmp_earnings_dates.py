@@ -1,4 +1,4 @@
-"""get_earnings_dates: stable/earnings ก่อน แล้ว fallback v3 (แบบเดียวกับ historical)"""
+"""get_earnings_dates: stable/earnings อย่างเดียว (legacy v3 ตายสำหรับ key ใหม่ — ไม่ลองแล้ว)"""
 from fmp_client import FMPClient
 
 
@@ -20,20 +20,19 @@ def test_stable_endpoint_used_first(monkeypatch):
     assert "stable/earnings" in calls[0]
 
 
-def test_falls_back_to_v3(monkeypatch):
+def test_no_legacy_v3_fallback(monkeypatch):
+    """api/v3/historical/earning_calendar ตอบ 403 "Legacy Endpoint" กับ key หลัง 31 ส.ค. 2025
+    ทุกครั้ง — เรียกต่อมีแต่เสียเวลา rate-limit + log noise · stable ว่าง = จบ"""
     calls = []
 
     def fake_get(self, url, params=None, quiet=False):
         calls.append(url)
-        if "stable" in url:
-            return None  # key ใหม่บาง endpoint โดน 403
-        return [{"symbol": "AAPL", "date": "2026-08-14"}]
+        return None
 
     monkeypatch.setattr(FMPClient, "_rate_limited_get", fake_get)
-    rows = make_client().get_earnings_dates("AAPL")
-    assert rows and rows[0]["date"] == "2026-08-14"
-    assert len(calls) == 2
-    assert "api/v3/historical/earning_calendar/AAPL" in calls[1]
+    assert make_client().get_earnings_dates("AAPL") is None
+    assert len(calls) == 1
+    assert "stable/earnings" in calls[0]
 
 
 def test_returns_none_when_all_fail(monkeypatch):
