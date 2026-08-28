@@ -1,6 +1,6 @@
 """Lookup รายตัว: พิมพ์ ticker → snapshot ราคา + วันงบ + สัญญาณหลังงบ
 
-ใช้ข้อมูล EOD จาก FMP (2 API calls ต่อหุ้น: แท่งราคา 250 วัน + วันงบรายตัว)
+ราคา EOD ผ่าน bot.prices (Yahoo หลัก, FMP สำรอง) + วันงบรายตัว
 daily_prices ทุกฟังก์ชัน = list[dict] most-recent-first (convention เดียวกับ levels.py)
 """
 import re
@@ -15,6 +15,7 @@ if str(ETA_DIR) not in sys.path:
 from analyze_earnings_trades import analyze_stock, normalize_timing  # noqa: E402
 
 from bot import fetch_cache  # noqa: E402
+from bot.prices import get_prices  # noqa: E402
 from bot.signals import earnings_from_signals  # noqa: E402
 from bot.levels import (  # noqa: E402
     compute_levels, detect_low_break, detect_new_breaks, detect_sl_break,
@@ -172,35 +173,22 @@ def build_snapshot(symbol, prices, meta=None, earnings=None, today=None):
     return snap
 
 
-class SymbolNotCovered(Exception):
-    """FMP ตอบ 402: หุ้นนอกแผนปัจจุบัน (ฟรีทีร์จำกัดรายชื่อ) — ticker ที่ไม่มีจริง
-    ก็ได้ 402 เหมือนกัน จึงแยกสองเคสนี้จากกันไม่ได้"""
-
-
-def lookup_symbol(client, symbol, universe, today=None, fallback_prices_fn=None,
+def lookup_symbol(client, symbol, universe, today=None, get_prices_fn=None,
                   known_earnings_fn=earnings_from_signals):
-    """ดึงข้อมูลหุ้นหนึ่งตัวแล้วประกอบ snapshot (None = ไม่พบข้อมูล)
+    """ดึงข้อมูลหุ้นหนึ่งตัวแล้วประกอบ snapshot (None = ไม่พบข้อมูล/ไม่มีแหล่งราคา)
 
-    fallback_prices_fn(symbol, days) → แท่งราคาแหล่งสำรอง ใช้เมื่อ FMP ตอบ 402
+    get_prices_fn(symbol, days) → แท่งราคา (ค่าเริ่มต้น bot.prices.get_prices:
+    cache → Yahoo → FMP สำรอง) · ticker ผิดหรือทุกแหล่งว่าง = None เหมือนกัน
     known_earnings_fn(symbol) → วันงบที่บอทรู้อยู่แล้ว (signals.json) ใช้เมื่อ FMP
     รายตัวไม่ให้ (402/ว่าง) — ไม่ cache ค่าสำรอง ให้ FMP ที่กลับมาใช้ได้ชนะในรอบถัดไป
-    raise SymbolNotCovered ถ้าแผน FMP ไม่ครอบคลุมและแหล่งสำรองก็ไม่มีข้อมูล
     ราคา/วันงบผ่าน fetch_cache — job เช้าหลายตัวดึงหุ้นชุดเดียวกันไม่เปลืองงบซ้ำ
     """
+    fetch = get_prices_fn or (lambda s, d: get_prices(s, d, client=client))
     prices = fetch_cache.get(("prices", symbol, 250))
     if prices is None:
-        client.saw_402 = False  # ธงต่อ symbol — client ตัวเดียวใช้หลายตัวต่อข้อความ
-        prices = client.get_historical_prices(symbol, days=250)
+        prices = fetch(symbol, 250)
         if not prices or len(prices) < 2:
-            if not getattr(client, "saw_402", False):
-                return None
-            if fallback_prices_fn:
-                try:
-                    prices = fallback_prices_fn(symbol, 250)
-                except Exception:
-                    prices = None
-            if not prices or len(prices) < 2:
-                raise SymbolNotCovered(symbol)
+            return None
         fetch_cache.put(("prices", symbol, 250), prices)
     earnings = fetch_cache.cached(
         ("earnings", symbol), lambda: client.get_earnings_dates(symbol))

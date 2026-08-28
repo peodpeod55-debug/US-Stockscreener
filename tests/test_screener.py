@@ -82,35 +82,37 @@ class Fake402Client(FakeClient):
         return super().get_historical_prices(symbol, days)
 
 
-def test_run_scan_separates_plan_blocked_from_no_data():
-    """402 → reason not_in_plan · ไม่มีข้อมูลเฉย ๆ → no_data (ธงต้อง reset ต่อตัว)"""
+def test_run_scan_no_price_source_marks_no_data():
+    """Yahoo (ปิดในเทส) ว่าง + FMP 402 หรือว่างเฉย ๆ → no_data ทั้งคู่
+    (ไม่มี not_in_plan แล้ว — Yahoo เป็นหลัก ตัวที่ดึงไม่ได้ต้องถูกลองใหม่รอบถัดไป)"""
     bars = _uptrend_prices()
     earn_date = bars[2]["date"]
     calendar = [
-        {"symbol": "WMT", "date": earn_date, "time": "amc"},   # โดน 402 ก่อน
+        {"symbol": "WMT", "date": earn_date, "time": "amc"},   # FMP 402
         {"symbol": "AAPL", "date": earn_date, "time": "amc"},  # ไม่มีข้อมูลเฉย ๆ
     ]
     cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
     scan = run_scan(cfg, lookback_days=3,
                     client=Fake402Client(calendar, {}, blocked={"WMT"}))
     reasons = {p["symbol"]: p["reason"] for p in scan["pending"]}
-    assert reasons == {"WMT": "not_in_plan", "AAPL": "no_data"}
+    assert reasons == {"WMT": "no_data", "AAPL": "no_data"}
 
 
-def test_run_scan_fallback_prices_rescue_402_symbol():
-    """หุ้นโดน 402 แต่แหล่งสำรองมีราคา → ต้องถูกวิเคราะห์ปกติ ไม่ค้างใน pending"""
+def test_run_scan_uses_injected_price_source_once_per_symbol():
+    """get_prices_fn (ฉีดได้) มีราคา → วิเคราะห์ปกติ แม้ FMP 402 · เรียกตัวละครั้ง
+    (prefetch อุ่น cache แล้ว ลูปต้องอ่านจาก cache ไม่ดึงซ้ำ)"""
     bars = _uptrend_prices()
     calendar = [{"symbol": "WMT", "date": bars[2]["date"], "time": "amc"}]
     calls = []
 
-    def fallback(symbol, days):
+    def source(symbol, days):
         calls.append((symbol, days))
         return bars
 
     cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
     scan = run_scan(cfg, lookback_days=3,
                     client=Fake402Client(calendar, {}, blocked={"WMT"}),
-                    fallback_prices_fn=fallback)
+                    get_prices_fn=source)
     assert calls == [("WMT", 250)]
     assert scan["pending"] == []
     total = (len(scan["candidates"]) + scan["skipped_counts"]["C"]
@@ -118,43 +120,36 @@ def test_run_scan_fallback_prices_rescue_402_symbol():
     assert total == 1
 
 
-def test_run_scan_fallback_failure_keeps_not_in_plan():
+def test_run_scan_price_source_error_marks_no_data():
+    """แหล่งราคาพัง (raise) → หุ้นตัวนั้นรอรอบถัดไป ไม่ล้มสแกนทั้งรอบ"""
     bars = _uptrend_prices()
     calendar = [{"symbol": "WMT", "date": bars[2]["date"], "time": "amc"}]
 
-    def fallback(symbol, days):
-        raise ConnectionError("stooq down")
+    def source(symbol, days):
+        raise ConnectionError("yahoo down")
 
     cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
     scan = run_scan(cfg, lookback_days=3,
                     client=Fake402Client(calendar, {}, blocked={"WMT"}),
-                    fallback_prices_fn=fallback)
+                    get_prices_fn=source)
     assert [(p["symbol"], p["reason"]) for p in scan["pending"]] == \
-        [("WMT", "not_in_plan")]
+        [("WMT", "no_data")]
 
 
-def test_run_scan_fallback_not_used_without_402():
-    """ไม่มีข้อมูลเฉย ๆ (ไม่ใช่ 402) → ไม่เรียกแหล่งสำรอง, reason ยังเป็น no_data"""
+def test_run_scan_default_price_source_falls_back_to_client():
+    """ไม่ฉีด get_prices_fn: Yahoo (ปิดในเทส) ว่าง → ราคามาจาก client (FMP) ตามเดิม"""
     bars = _uptrend_prices()
     calendar = [{"symbol": "AAPL", "date": bars[2]["date"], "time": "amc"}]
-    calls = []
-
-    def fallback(symbol, days):
-        calls.append(symbol)
-        return bars
-
     cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
     scan = run_scan(cfg, lookback_days=3,
-                    client=FakeClient(calendar, {}),
-                    fallback_prices_fn=fallback)
-    assert calls == []
-    assert [(p["symbol"], p["reason"]) for p in scan["pending"]] == \
-        [("AAPL", "no_data")]
+                    client=FakeClient(calendar, {"AAPL": bars}))
+    assert scan["pending"] == []
+    assert scan["reported_symbols"] == ["AAPL"]
 
 
 def test_run_scan_merges_secondary_calendar():
     """หุ้นที่แผนฟรีซ่อนจากปฏิทิน FMP ต้องถูกเติมจากแหล่งที่สอง
-    → ตัวที่โดน 402 ขึ้น not_in_plan / ตัวซ้ำ+นอก universe ถูกกรอง"""
+    → ตัวที่ไม่มีราคา (402) ขึ้น no_data / ตัวซ้ำ+นอก universe ถูกกรอง"""
     bars = _uptrend_prices()
     earn_date = bars[2]["date"]
     calendar = [{"symbol": "AAPL", "date": earn_date, "time": "amc"}]
@@ -176,7 +171,7 @@ def test_run_scan_merges_secondary_calendar():
     assert scan["reported_symbols"] == ["AAPL", "HD"]
     assert seen_ranges == [(scan["from_date"], scan["to_date"])]
     reasons = {p["symbol"]: p["reason"] for p in scan["pending"]}
-    assert reasons.get("HD") == "not_in_plan"
+    assert reasons.get("HD") == "no_data"
 
 
 def test_run_scan_secondary_failure_does_not_break_scan():
@@ -340,11 +335,11 @@ def test_run_scan_carries_pending_across_calendar_window():
     assert pending_mod.load_pending() == []
 
 
-def test_run_scan_does_not_carry_plan_blocked():
-    """402 = นอกแผนถาวร รอไปก็ไม่ได้ผล — ต้องไม่ถูกจำ"""
+def test_run_scan_carries_symbol_without_price_source():
+    """Yahoo สะดุด + FMP 402 = no_data → ต้องถูกจำไว้ลองใหม่รอบถัดไป (ไม่ใช่ถาวรแล้ว)"""
     bars = _uptrend_prices()
     calendar = [{"symbol": "HD", "date": bars[2]["date"], "time": "amc"}]
     cfg = Config(telegram_token="t", chat_id="1", fmp_api_key="k")
     run_scan(cfg, lookback_days=3,
              client=Fake402Client(calendar, {}, blocked={"HD"}))
-    assert pending_mod.load_pending() == []
+    assert [p["symbol"] for p in pending_mod.load_pending()] == ["HD"]

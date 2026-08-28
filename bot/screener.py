@@ -1,6 +1,7 @@
 """Core scan: universe → earnings calendar → 5-factor score → levels"""
 import csv
 import json
+import logging
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -15,9 +16,12 @@ from fmp_client import ApiCallBudgetExceeded, FMPClient  # noqa: E402
 
 from bot import fetch_cache, pending as pending_store  # noqa: E402
 from bot.levels import compute_levels, infer_bmo, positive_reaction  # noqa: E402
+from bot.prices import get_prices, prefetch  # noqa: E402
 
 UNIVERSE_CSV = PROJECT_ROOT / "us_stock_list.csv"
 REPORTS_DIR = PROJECT_ROOT / "reports"
+
+logger = logging.getLogger("bot.screener")
 
 
 def load_universe(csv_path=UNIVERSE_CSV):
@@ -35,12 +39,12 @@ def load_universe(csv_path=UNIVERSE_CSV):
 
 
 def run_scan(config, lookback_days=None, client=None, secondary_cal_fn=None,
-             fallback_prices_fn=None, today=None, pending_path=None):
+             get_prices_fn=None, today=None, pending_path=None):
     """สแกนหุ้นออกงบใน universe ให้คะแนน 5-factor + levels
 
     secondary_cal_fn(from_date, to_date) → ปฏิทินแหล่งที่สอง (รูปเดียวกับ FMP)
     ไว้เติมหุ้นที่แผนฟรี FMP กรองออกจากปฏิทินเงียบ ๆ — แหล่งเสริมล้มได้โดยไม่พังสแกน
-    fallback_prices_fn(symbol, days) → แท่งราคาแหล่งสำรอง ใช้เฉพาะหุ้นที่ FMP ตอบ 402
+    get_prices_fn(symbol, days) → แท่งราคา (ค่าเริ่มต้น bot.prices.get_prices: Yahoo → FMP)
     today: datetime อ้างอิง (เทส) · pending_path: ไฟล์รายการรอตอบรับข้ามรอบ (bot/pending.py)
 
     เกณฑ์ candidate: วันตอบรับงบต้องปิดบวก (positive_reaction) แล้วค่อยให้เกรด A/B —
@@ -88,27 +92,25 @@ def run_scan(config, lookback_days=None, client=None, secondary_cal_fn=None,
         if item["timing"] == "unknown":
             item["timing"] = timing_map.get(_canon(item["symbol"]), "unknown")
 
+    # อุ่น cache ทุกตัวพร้อมกันก่อน (Yahoo หลัก) — ลูปข้างล่างอ่านจาก cache เป็นหลัก
+    fetch = get_prices_fn or (lambda s, d: get_prices(s, d, client=client))
+    prefetch([i["symbol"] for i in reported], 250, get_fn=fetch)
     candidates, skipped, pending = [], {"C": 0, "D": 0, "down": 0}, []
     for item in reported:
         sym = item["symbol"]
         prices = fetch_cache.get(("prices", sym, 250))
-        blocked = False
         if prices is None:
-            client.saw_402 = False  # ธงต่อ symbol — ดู lookup.lookup_symbol
             try:
-                prices = client.get_historical_prices(sym, days=250)
+                prices = fetch(sym, 250)
             except ApiCallBudgetExceeded:
                 break
-            blocked = getattr(client, "saw_402", False)
-            if (not prices or len(prices) < 70) and blocked and fallback_prices_fn:
-                try:
-                    prices = fallback_prices_fn(sym, 250) or []
-                except Exception:
-                    prices = []
+            except Exception:
+                logger.warning("prices %s failed", sym, exc_info=True)
+                prices = None
             fetch_cache.put(("prices", sym, 250), prices)
         if not prices or len(prices) < 70:
-            pending.append({**item,
-                            "reason": "not_in_plan" if blocked else "no_data"})
+            # ไม่มีแหล่งไหนให้ราคา (Yahoo สะดุด/FMP 402) → จำไว้ลองใหม่รอบถัดไป
+            pending.append({**item, "reason": "no_data"})
             continue
         timing = item["timing"]
         if timing == "unknown" and infer_bmo(prices, item["date"]):

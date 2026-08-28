@@ -5,6 +5,7 @@ from bot.formatter import format_open_report
 from bot.openbell import (
     build_open_item,
     build_open_report,
+    fetch_quote,
     fetch_yahoo_quote,
     in_open_window,
 )
@@ -118,6 +119,42 @@ def test_fetch_yahoo_quote_failure_returns_none():
     assert fetch_yahoo_quote("NVDA", get=lambda *a, **k: FakeResp({}, 500)) is None
     assert fetch_yahoo_quote(
         "NVDA", get=lambda *a, **k: FakeResp({"chart": {"result": []}})) is None
+
+
+# ── fetch_quote: Yahoo หลัก → FMP สำรอง (ทางเดียวกับราคา EOD ใน bot/prices.py) ──
+
+class _QuoteClient:
+    def __init__(self, quote=None):
+        self._quote = quote
+        self.calls = []
+        self.saw_402 = True  # ค้างจากตัวก่อนหน้า — ต้องถูก reset ก่อนเรียก
+
+    def get_quote(self, symbol):
+        self.calls.append(symbol)
+        return self._quote
+
+
+def test_fetch_quote_uses_yahoo_first():
+    client = _QuoteClient(quote={"price": 1, "open": 1, "previousClose": 1})
+    q = fetch_quote("NVDA", client=client,
+                    yahoo_fn=lambda s: {"price": 105.0, "open": 102.0,
+                                        "previousClose": 100.0})
+    assert q["price"] == 105.0
+    assert client.calls == []
+
+
+def test_fetch_quote_falls_back_to_fmp_when_yahoo_empty():
+    client = _QuoteClient(quote={"price": 9.0, "open": 8.0, "previousClose": 7.0})
+    q = fetch_quote("NVDA", client=client, yahoo_fn=lambda s: None)
+    assert q["price"] == 9.0
+    assert client.calls == ["NVDA"]
+    assert client.saw_402 is False
+
+
+def test_fetch_quote_none_when_no_source():
+    assert fetch_quote("NVDA", client=_QuoteClient(None),
+                       yahoo_fn=lambda s: None) is None
+    assert fetch_quote("NVDA", client=None, yahoo_fn=lambda s: None) is None
 
 
 # ── FMPClient.get_quote ──────────────────────────────────────────

@@ -1,6 +1,14 @@
 import pytest
 
-from bot import fetch_cache, pending, signals
+from bot import fetch_cache, pending, prices, signals
+
+
+@pytest.fixture(autouse=True)
+def _no_yahoo_network(monkeypatch):
+    """Yahoo เป็นแหล่งราคาหลัก (bot/prices.py) — เทสต์ห้ามยิงเครือข่ายจริง
+    ปิดไว้ = ราคาไหลไป client ปลอม (FMP path) ตามที่เทสต์แต่ละไฟล์ตั้งไว้"""
+    monkeypatch.setattr(prices, "fetch_yahoo_prices",
+                        lambda symbol, days=250: None)
 
 
 @pytest.fixture(autouse=True)

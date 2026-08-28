@@ -57,6 +57,22 @@ def build_open_report(symbols, get_quote):
     return items
 
 
+def fetch_quote(symbol, client=None, yahoo_fn=None):
+    """quote สด: Yahoo หลัก → FMP สำรอง (ทางเดียวกับราคา EOD ใน bot/prices.py)
+
+    คืนรูป FMP (price/open/previousClose) หรือ None ถ้าไม่มีแหล่งไหนให้
+    """
+    yahoo_fn = yahoo_fn or fetch_yahoo_quote
+    try:
+        q = yahoo_fn(symbol)
+    except Exception:
+        q = None
+    if q is None and client is not None:
+        client.saw_402 = False  # ธงต่อ symbol — client ตัวเดียวใช้หลายตัว
+        q = client.get_quote(symbol)
+    return q
+
+
 def fetch_yahoo_quote(symbol, get=requests.get, raw=False):
     """quote สำรองจาก Yahoo v8 (range 1d) — คืนรูปเดียวกับ FMP หรือ None
 

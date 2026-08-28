@@ -20,7 +20,7 @@ def get(key, now=None):
     fetched_at, value = entry
     now = now or datetime.now()
     if now - fetched_at >= CACHE_TTL:
-        del _cache[key]
+        _cache.pop(key, None)  # หลาย thread (prefetch) อาจลบพร้อมกัน
         return None
     return list(value) if isinstance(value, list) else value
 

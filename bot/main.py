@@ -49,8 +49,8 @@ from bot.formatter import (
 from bot.hot import classify_watch
 from bot.levels import below_low_5d
 from bot.jobstate import PUSH_WEEKDAYS, already_ran, claim, due_catchup, release
-from bot.openbell import build_open_report, fetch_yahoo_quote, in_open_window
-from bot.lookup import LOOKUP_MAX, SymbolNotCovered, lookup_symbol, parse_tickers
+from bot.openbell import build_open_report, fetch_quote, fetch_yahoo_quote, in_open_window
+from bot.lookup import LOOKUP_MAX, lookup_symbol, parse_tickers
 from bot.nasdaq_cal import fetch_nasdaq_earnings
 from bot.reminders import build_reminders
 from bot.screener import load_universe, run_scan, save_reports
@@ -58,6 +58,7 @@ from bot.signals import load_signals, record_signals, signals_since
 from bot.stats import build_stats, summarize
 from bot.status import build_status
 from bot.weekly import SIGNAL_LOOKBACK_DAYS, build_weekly_items
+from bot.prices import get_prices, prefetch
 from bot.yahoo_prices import fetch_yahoo_prices
 from bot.watchlist import (
     AUTO_WATCH_DAYS,
@@ -123,8 +124,7 @@ async def _send_chart(bot, chat_id, symbol, levels=None, caption=None,
 
 async def _do_scan_and_send(bot, chat_id, lookback):
     scan = await asyncio.to_thread(run_scan, CONFIG, lookback,
-                                   secondary_cal_fn=fetch_nasdaq_earnings,
-                                   fallback_prices_fn=fetch_yahoo_prices)
+                                   secondary_cal_fn=fetch_nasdaq_earnings)
     messages = format_scan(scan)
     save_reports(scan, messages)
     # บันทึกสัญญาณ A/B ลง signals.json (dedup ต่อรอบงบ) — ฐานของสรุปรายสัปดาห์
@@ -248,12 +248,11 @@ async def _watch_snapshots(update, symbols):
     client = FMPClient(api_key=CONFIG.fmp_api_key,
                        max_api_calls=3 * len(symbols) + 2)
     universe = load_universe()
+    await asyncio.to_thread(prefetch, symbols, 250, client)  # ดึงขนานก่อน
     items = []
     for sym in symbols:
         try:
-            snap = await asyncio.to_thread(
-                lookup_symbol, client, sym, universe,
-                fallback_prices_fn=fetch_yahoo_prices)
+            snap = await asyncio.to_thread(lookup_symbol, client, sym, universe)
         except Exception:
             logger.exception("watch detail %s failed", sym)
             snap = None
@@ -320,10 +319,7 @@ def _build_dr_report(sym, meta, drs):
     fx = fetch_cache.cached(
         ("fx", "USDTHB"),
         lambda: fetch_yahoo_prices("USDTHB=X", 120, raw=True))
-    us = fetch_cache.get(("prices", sym, 250))
-    if us is None:
-        us = fetch_yahoo_prices(sym, 250)
-        fetch_cache.put(("prices", sym, 250), us)
+    us = get_prices(sym, 250)  # Yahoo (ไม่มี client → ไม่แตะ FMP) + cache
     fx_quote = fetch_yahoo_quote("USDTHB=X", raw=True)
     items = []
     for d in drs[:DR_MAX]:
@@ -461,15 +457,10 @@ async def _dispatch_text(update, context, text):
     manual = set(load_watchlist())
     auto = set(active_auto())
     all_row_pending = len(tickers) >= 2   # แถว "ติดตามทั้งชุด" ติดข้อความแรกที่สำเร็จ
+    await asyncio.to_thread(prefetch, tickers, 250, client)  # ดึงขนานก่อน
     for sym in tickers:
         try:
-            snap = await asyncio.to_thread(lookup_symbol, client, sym, universe,
-                                           fallback_prices_fn=fetch_yahoo_prices)
-        except SymbolNotCovered:
-            await update.message.reply_text(
-                f"🔒 ดึง {sym} ไม่ได้ — ticker ไม่ถูกต้อง "
-                "หรือหุ้นตัวนี้ไม่อยู่ในแผนฟรีของ FMP (ฟรีทีร์จำกัดรายชื่อหุ้น)")
-            continue
+            snap = await asyncio.to_thread(lookup_symbol, client, sym, universe)
         except Exception:
             logger.exception("lookup %s failed", sym)
             await update.message.reply_text(
@@ -477,7 +468,8 @@ async def _dispatch_text(update, context, text):
             continue
         if snap is None:
             await update.message.reply_text(
-                f"❌ ไม่พบข้อมูล {sym} — เช็ค ticker เช่น NVDA / AAPL / BRK.B")
+                f"❌ ไม่พบข้อมูล {sym} — เช็ค ticker เช่น NVDA / AAPL / BRK.B "
+                "(หรือแหล่งราคาสะดุดชั่วคราว ลองใหม่อีกครั้ง)")
             continue
         markup = build_watch_markup(
             sym, in_manual=sym in manual, in_auto=sym in auto,
@@ -562,11 +554,10 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
         universe = load_universe()
         auto = active_auto()
         alerts, sl_alerts, low_alerts, dead = [], [], [], []
+        await asyncio.to_thread(prefetch, symbols, 250, client)  # ดึงขนานก่อน
         for sym in symbols:
             try:
-                snap = await asyncio.to_thread(
-                    lookup_symbol, client, sym, universe,
-                    fallback_prices_fn=fetch_yahoo_prices)
+                snap = await asyncio.to_thread(lookup_symbol, client, sym, universe)
             except Exception:
                 logger.exception("breakout check %s failed", sym)
                 continue
@@ -617,14 +608,8 @@ async def openbell_job(context: ContextTypes.DEFAULT_TYPE):
         client = FMPClient(api_key=CONFIG.fmp_api_key,
                            max_api_calls=len(symbols) + 2)
 
-        def get_quote(sym):
-            client.saw_402 = False
-            q = client.get_quote(sym)
-            if q is None and getattr(client, "saw_402", False):
-                q = fetch_yahoo_quote(sym)
-            return q
-
-        items = await asyncio.to_thread(build_open_report, symbols, get_quote)
+        items = await asyncio.to_thread(
+            build_open_report, symbols, lambda sym: fetch_quote(sym, client=client))
         msg = format_open_report(items)
         if msg:
             await context.bot.send_message(chat_id=CONFIG.chat_id, text=msg)
@@ -633,26 +618,17 @@ async def openbell_job(context: ContextTypes.DEFAULT_TYPE):
 
 
 def _weekly_get_prices(client, sym):
-    """ราคาสำหรับสรุปรายสัปดาห์ — cache ก่อน, FMP, 402 → yahoo (แบบเดียวกับ lookup)"""
-    def fetch():
-        client.saw_402 = False
-        prices = client.get_historical_prices(sym, days=250)
-        if not prices and getattr(client, "saw_402", False):
-            try:
-                prices = fetch_yahoo_prices(sym, 250)
-            except Exception:
-                prices = None
-        return prices
-
-    return fetch_cache.cached(("prices", sym, 250), fetch)
+    """ราคาสำหรับสรุปรายสัปดาห์/สถิติ — ทางเดียวกับ lookup (cache → Yahoo → FMP)"""
+    return get_prices(sym, 250, client=client)
 
 
 async def _send_weekly(bot, chat_id, notify_empty=False):
     """สรุปผลหุ้นที่บอทแจ้ง 30 วันล่าสุด (PEAD drift) — สัญญาณจาก signals.json"""
     client = FMPClient(api_key=CONFIG.fmp_api_key, max_api_calls=60)
+    signals = signals_since(SIGNAL_LOOKBACK_DAYS)
+    await asyncio.to_thread(prefetch, [s["symbol"] for s in signals], 250, client)
     items = await asyncio.to_thread(
-        build_weekly_items, signals_since(SIGNAL_LOOKBACK_DAYS),
-        lambda sym: _weekly_get_prices(client, sym))
+        build_weekly_items, signals, lambda sym: _weekly_get_prices(client, sym))
     msg = format_weekly(items)
     if msg:
         await bot.send_message(chat_id=chat_id, text=msg)
@@ -673,6 +649,7 @@ async def _send_stats(bot, chat_id):
         return
     client = FMPClient(api_key=CONFIG.fmp_api_key,
                        max_api_calls=len(signals) + 2)
+    await asyncio.to_thread(prefetch, [s["symbol"] for s in signals], 250, client)
     evaluated = await asyncio.to_thread(
         build_stats, signals, lambda sym: _weekly_get_prices(client, sym))
     msg = format_stats(summarize(evaluated), total=len(signals))

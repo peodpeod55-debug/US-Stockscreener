@@ -1,11 +1,8 @@
 from datetime import date, timedelta
 
-import pytest
-
 from bot.formatter import format_lookup
 from bot.lookup import (
     LOOKUP_MAX,
-    SymbolNotCovered,
     build_snapshot,
     lookup_symbol,
     parse_tickers,
@@ -197,45 +194,32 @@ def test_lookup_symbol_unknown_ticker_returns_none():
     assert lookup_symbol(FakeClient([]), "XXXX", {}, today=TODAY) is None
 
 
-def test_lookup_symbol_plan_blocked_raises():
-    # FMP แผนฟรีจำกัดบาง symbol (HTTP 402) — ต้องแยกจาก "ไม่พบข้อมูล"
+def test_lookup_symbol_no_price_source_returns_none():
+    """Yahoo (ปิดในเทส) ว่าง + FMP 402 → None เหมือน "ไม่พบข้อมูล" (ไม่มี exception แยกแล้ว)"""
     class BlockedClient(FakeClient):
         def get_historical_prices(self, symbol, days=250):
             self.saw_402 = True
             return None
 
-    with pytest.raises(SymbolNotCovered):
-        lookup_symbol(BlockedClient(None), "HD", {}, today=TODAY)
+    assert lookup_symbol(BlockedClient(None), "HD", {}, today=TODAY) is None
 
 
-def test_lookup_symbol_fallback_rescues_402():
-    """โดน 402 แต่แหล่งสำรองมีราคา → ได้ snapshot ไม่ raise"""
+def test_lookup_symbol_uses_injected_price_source():
+    """get_prices_fn มีราคา → ได้ snapshot แม้ FMP 402 · ไม่แตะ client"""
     class BlockedClient(FakeClient):
         def get_historical_prices(self, symbol, days=250):
-            self.saw_402 = True
-            return None
+            raise AssertionError("must not call FMP when source has data")
 
     calls = []
 
-    def fallback(symbol, days):
+    def source(symbol, days):
         calls.append((symbol, days))
         return make_prices(30)
 
     s = lookup_symbol(BlockedClient(None), "HD", {}, today=TODAY,
-                      fallback_prices_fn=fallback)
+                      get_prices_fn=source)
     assert calls == [("HD", 250)]
     assert s is not None and s["symbol"] == "HD" and s["price"] > 0
-
-
-def test_lookup_symbol_raises_when_fallback_also_fails():
-    class BlockedClient(FakeClient):
-        def get_historical_prices(self, symbol, days=250):
-            self.saw_402 = True
-            return None
-
-    with pytest.raises(SymbolNotCovered):
-        lookup_symbol(BlockedClient(None), "HD", {}, today=TODAY,
-                      fallback_prices_fn=lambda symbol, days: None)
 
 
 def test_lookup_symbol_resets_saw_402_between_symbols():
