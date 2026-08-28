@@ -126,3 +126,28 @@ def test_drop_button_removes_and_prunes_empty_row():
 def test_drop_last_button_returns_none():
     m = _markup([("🗑 A", "u:A")])
     assert drop_button(m, "u:A") is None
+
+
+# ── ปุ่ม 📋 แผน (p:SYM) ─────────────────────────────────────────
+
+def test_plan_button_appended_to_existing_markup():
+    from bot.buttons import add_plan_button
+    m = add_plan_button(build_watch_markup("NVDA"), "NVDA")
+    assert _flat(m) == [("➕ ติดตาม NVDA", "w:NVDA"), ("📋 แผนเทรด NVDA", "p:NVDA")]
+
+
+def test_plan_button_alone_when_no_markup():
+    from bot.buttons import add_plan_button
+    assert _flat(add_plan_button(None, "EL")) == [("📋 แผนเทรด EL", "p:EL")]
+
+
+def test_parse_plan_callback():
+    assert parse_callback("p:CRM") == ("plan", ["CRM"])
+    assert parse_callback("p:bad sym") is None
+
+
+def test_mark_pressed_leaves_plan_button_usable():
+    from bot.buttons import add_plan_button
+    m = add_plan_button(build_watch_markup("NVDA"), "NVDA")
+    m2 = mark_pressed(m, "w:NVDA")
+    assert ("📋 แผนเทรด NVDA", "p:NVDA") in _flat(m2)

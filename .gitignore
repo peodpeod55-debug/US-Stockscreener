@@ -10,3 +10,4 @@ bot.log
 *.tmp
 pending.json
 earnings_calendar.json
+settings.json

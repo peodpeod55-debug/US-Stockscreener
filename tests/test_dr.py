@@ -191,3 +191,35 @@ def test_format_dr_notes_hidden_symbols():
     assert "ไม่แสดงอีก 2" in msg
     assert "ไม่แสดงอีก" not in format_dr("NVDA", "NVIDIA",
                                           [("NVDA80", _prem())])
+
+
+# ── implied_ratio / avg_volume (ใช้ใน /plan และสรุปก่อน SET เปิด) ──
+
+def _ratio_fixture(n=15, k=0.03):
+    """DR/US/FX จับคู่ได้ n วัน ratio คงที่ k (ยกเว้นวันล่าสุด k×1.1 เพื่อเช็คว่าไม่นับ)"""
+    days = _weekdays(date(2026, 7, 1), n + 1)
+    us = _bars([(d, 100.0) for d in days])
+    fx = _bars([(d, 32.0) for d in days])
+    dr_rows = [(days[i + 1], 100.0 * 32.0 * (k * 1.1 if i == n - 1 else k))
+               for i in range(n)]
+    return _bars(dr_rows), us, fx
+
+
+def test_implied_ratio_is_baseline_median_excluding_last():
+    from bot.dr import implied_ratio
+    dr, us, fx = _ratio_fixture()
+    assert round(implied_ratio(dr, us, fx), 6) == 0.03
+
+
+def test_implied_ratio_none_when_pairs_short():
+    from bot.dr import implied_ratio
+    dr, us, fx = _ratio_fixture(n=BASELINE_MIN_PAIRS)      # ต้องมี > MIN คู่
+    assert implied_ratio(dr, us, fx) is None
+    assert implied_ratio([], us, fx) is None
+
+
+def test_avg_volume_last_n_bars():
+    from bot.dr import avg_volume
+    bars = [{"volume": 100}, {"volume": 300}, {"volume": 999}]
+    assert avg_volume(bars, n=2) == 200.0
+    assert avg_volume([], n=20) is None

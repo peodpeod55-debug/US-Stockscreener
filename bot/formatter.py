@@ -3,6 +3,8 @@ from datetime import date, timedelta
 
 from bot.hot import EARNINGS_SOON_DAYS, HOT_PCT
 from bot.levels import below_low_5d
+from bot.plan import LOT
+from bot.settings import risk_amount
 from bot.stats import HORIZONS
 
 MAX_LEN = 3800
@@ -392,6 +394,96 @@ def format_dr(symbol, name, items, hidden=0):
         lines += ["", f"(ไม่แสดงอีก {hidden} DR — เกินเพดานต่อข้อความ)"]
     lines += ["", f"(เทียบค่ากลาง ratio DR/หุ้นแม่ ย้อนหลัง — "
                   "บวก = DR แพงกว่าช่วงที่ผ่านมา)"]
+    return "\n".join(lines)
+
+
+# ── แผนเทรด (/plan) + ตั้งค่าเงินเสี่ยง (/risk) ─────────────────────
+_PLAN_NUM = {"now": "①", "breakout": "②", "pullback": "③"}
+_PLAN_STATE_TH = {
+    "below_sl": "⛔ ราคาต่ำกว่า SL แล้ว — ไม่เข้า",
+    "pending": "ยังไม่ทะลุ",
+    "above": "ทะลุแล้ว — ราคาเลยจุดเข้า",
+    "waiting": "รอย่อ",
+    "in_zone": "ราคาอยู่ในโซนแล้ว",
+}
+
+
+def _targets(ts):
+    return " / ".join(f"{t:,.2f}" for t in ts)
+
+
+def _plan_note(e, price):
+    """สถานะทางเข้า + ระยะจากราคาปัจจุบัน เช่น " (ยังไม่ทะลุ · ห่าง 2.9%)" — "" ถ้าเข้าได้เลย"""
+    note = _PLAN_STATE_TH.get(e["state"])
+    if not note:
+        return ""
+    if e["state"] in ("pending", "waiting") and e["entry"]:
+        note += f" · ห่าง {abs(price - e['entry']) / e['entry'] * 100:.1f}%"
+    return f" ({note})"
+
+
+def format_plan(plan, snap, hidden=0):
+    """แผนเทรดรายตัว: 3 ทางเข้า US (SL = D0 Low, เป้า 1R/2R/3R) + ราคาบาท/จำนวนหน่วยต่อ DR
+
+    plan จาก bot.plan.build_plan · hidden: DR ที่ถูกตัดเพราะเกินเพดาน (แจ้ง ไม่ตัดเงียบ)
+    """
+    sym, price = plan["symbol"], plan["price"]
+    head = f"📋 แผนเทรด {sym} — {snap.get('name') or sym}"
+    if snap.get("grade"):
+        head += f"   [เกรด {snap['grade']} · {snap['score']:.0f}/100]"
+    sl_pct = f" (-{plan['sl_pct']}%)" if plan.get("sl_pct") is not None else ""
+    lines = [head,
+             f"💰 ปิดล่าสุด {price:,.2f} · 🛑 SL = D0 Low {plan['sl']:,.2f}{sl_pct}"]
+    lv = snap.get("levels") or {}
+    if snap.get("last_earnings"):
+        timing = (f" ({snap['timing'].upper()})"
+                  if snap.get("timing") and snap["timing"] != "unknown" else "")
+        react = (f" · วันตอบรับ {_signed(lv['reaction_pct'])}"
+                 if lv.get("reaction_pct") is not None else "")
+        lines.append(f"🗓 งบ {snap['last_earnings']}{timing}{react}")
+    lines += ["", "🇺🇸 ราคาหุ้นแม่ (USD) · เป้า 1R / 2R / 3R"]
+    for e in plan["entries"]:
+        lines.append(f"{_PLAN_NUM[e['kind']]} {e['label']} {e['entry']:,.2f}"
+                     f"{_plan_note(e, price)}")
+        if e["risk"] is not None:
+            lines.append(f"   เสี่ยง {e['risk']:,.2f} ({e['risk_pct']:.2f}%) · "
+                         f"เป้า {_targets(e['targets'])}")
+    for d in plan["drs"]:
+        dr_px = f"฿{d['dr_price']:,.2f} · " if d.get("dr_price") is not None else ""
+        lines += ["", f"🇹🇭 {d['dr']} — {dr_px}ratio {d['ratio']:.4f} · "
+                      f"USDTHB {d['fx']:.2f}"]
+        for row in d["rows"]:
+            line = (f"{_PLAN_NUM[row['kind']]} {row['entry_thb']:,.2f} · "
+                    f"SL {row['sl_thb']:,.2f}")
+            if row["units"] is not None:
+                line += f" · {row['units']:,.0f} หน่วย ≈ ฿{row['cost_thb']:,.0f}"
+            lines.append(line)
+            if row["targets_thb"]:
+                lines.append(f"   เป้า {_targets(row['targets_thb'])}")
+    if hidden:
+        lines += ["", f"(+{hidden} DR ไม่แสดง — โชว์ {len(plan['drs'])} ตัววอลุ่มสูงสุด)"]
+    lines.append("")
+    if plan.get("risk_amount"):
+        lines.append(f"💵 เสี่ยง {plan['risk_amount']:,.0f} บาท/ไม้ · "
+                     f"หน่วยปัดลง lot {LOT} · แก้ด้วย /risk")
+    else:
+        lines.append("💵 ยังไม่ตั้งเงินเสี่ยง — พิมพ์ /risk 1% ทุน 500000 "
+                     "แล้วบอทจะคำนวณจำนวนหน่วย DR ให้")
+    return "\n".join(lines)
+
+
+def format_settings(s):
+    """ค่าทุน/%เสี่ยงปัจจุบัน + วิธีตั้ง (พิมพ์ เสี่ยง / /risk เฉย ๆ)"""
+    cap, rp = s.get("capital_thb"), s.get("risk_pct")
+    rp_txt = f"{rp:g}%" if rp is not None else "n/a"
+    lines = ["⚙️ เงินเสี่ยงต่อไม้ (ใช้คิดจำนวนหน่วย DR ใน /plan)"]
+    amt = risk_amount(s)
+    if amt:
+        lines.append(f"ทุน {cap:,.0f} บาท × เสี่ยง {rp_txt} = {amt:,.0f} บาท/ไม้")
+    else:
+        lines.append(f"เสี่ยง {rp_txt}/ไม้ · ยังไม่ตั้งทุน → แผนมีราคาบาทแต่ไม่มีจำนวนหน่วย")
+    lines.append("ตั้งค่า: /risk 1% ทุน 500000 (หรือพิมพ์ เสี่ยง 1% ทุน 500000 · "
+                 "ค่าที่ไม่พิมพ์คงเดิม)")
     return "\n".join(lines)
 
 

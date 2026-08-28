@@ -55,6 +55,27 @@ def pair_ratios(dr_prices, us_prices, fx_prices):
     return ratios
 
 
+def implied_ratio(dr_prices, us_prices, fx_prices):
+    """ratio ปกติของ DR = median ของ k ย้อนหลัง ≤ BASELINE_DAYS คู่ (ไม่รวมวันล่าสุด)
+
+    ใช้ทั้ง premium (dr) และแปลงราคา US → บาทใน /plan · None ถ้าคู่ข้อมูลไม่พอ
+    """
+    if not dr_prices:
+        return None
+    recent = dr_prices[:BASELINE_DAYS + 1]
+    ratios = pair_ratios(recent, us_prices, fx_prices)
+    if len(ratios) < BASELINE_MIN_PAIRS + 1:
+        return None
+    return median(ratios[:-1]) or None
+
+
+def avg_volume(bars, n=20):
+    """วอลุ่มเฉลี่ย n แท่งล่าสุด (bars most-recent-first) — None ถ้าไม่มีแท่ง"""
+    vols = [b.get("volume") for b in (bars or [])[:n]]
+    vols = [v for v in vols if v is not None]
+    return sum(vols) / len(vols) if vols else None
+
+
 def compute_premium(dr_prices, us_prices, fx_prices, dr_quote=None,
                     fx_quote=None):
     """premium ของ DR ล่าสุดเทียบ ratio ปกติ — None ถ้าคู่ข้อมูลไม่พอ
@@ -66,14 +87,8 @@ def compute_premium(dr_prices, us_prices, fx_prices, dr_quote=None,
     premium_pct, live (ใช้ quote สดไหม), day_pct (%วันนี้ — เฉพาะ live),
     fx_live (FX จาก quote สดไหม)
     """
-    if not dr_prices:
-        return None
-    recent = dr_prices[:BASELINE_DAYS + 1]
-    ratios = pair_ratios(recent, us_prices, fx_prices)
-    if len(ratios) < BASELINE_MIN_PAIRS + 1:
-        return None
-    baseline = median(ratios[:-1])
-    if not baseline:
+    baseline = implied_ratio(dr_prices, us_prices, fx_prices)
+    if baseline is None:
         return None
     last = dr_prices[0]
     us = _latest_before(us_prices, last["date"])

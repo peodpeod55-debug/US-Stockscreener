@@ -19,6 +19,7 @@ from telegram.ext import (
 from bot import fetch_cache, instance_lock
 from bot.breakouts import record_breakouts
 from bot.buttons import (
+    add_plan_button,
     build_unwatch_markup,
     build_watch_all_markup,
     build_watch_markup,
@@ -29,7 +30,8 @@ from bot.buttons import (
 from bot.calendar_preview import build_calendar, parse_calendar_command
 from bot.chart import build_chart_png
 from bot.config import PROJECT_ROOT, load_config
-from bot.dr import DR_MAX, compute_premium, parse_dr_command, parse_dr_symbols
+from bot.dr import (DR_MAX, avg_volume, compute_premium, implied_ratio,
+                    parse_dr_command, parse_dr_symbols)
 from bot.formatter import (
     format_breakouts,
     format_calendar,
@@ -39,9 +41,11 @@ from bot.formatter import (
     format_lookup,
     format_low_breaks,
     format_open_report,
+    format_plan,
     format_reminders,
     format_scan,
     format_scanlog,
+    format_settings,
     format_sl_breaks,
     format_stats,
     format_status,
@@ -54,10 +58,13 @@ from bot.jobstate import PUSH_WEEKDAYS, already_ran, claim, due_catchup, release
 from bot.openbell import build_open_report, fetch_quote, fetch_yahoo_quote, in_open_window
 from bot.lookup import LOOKUP_MAX, lookup_symbol, parse_tickers
 from bot.nasdaq_cal import fetch_nasdaq_earnings
+from bot.plan import (PLAN_MAX, build_plan, parse_plan_command,
+                      plan_unavailable_reason, rank_drs)
 from bot.reminders import build_reminders
 from bot.scan_csv import live_scores, pick_rows, record_scan_csv
 from bot.screener import load_universe, run_scan, save_reports
 from bot.set_score import SET_MIN_RET_PCT, SET_MIN_VOL_RATIO
+from bot.settings import load_settings, parse_risk_command, risk_amount, update_settings
 from bot.signals import load_signals, record_signals, signals_since
 from bot.stats import build_stats, summarize
 from bot.status import build_status
@@ -149,9 +156,9 @@ async def _do_scan_and_send(bot, chat_id, lookback):
         await _send_chart(bot, chat_id, c["symbol"], c["levels"],
                           caption=f"📈 {c['symbol']} — เกรด {c['grade']} "
                                   f"({c['score']:.0f}/100)",
-                          reply_markup=build_watch_markup(
+                          reply_markup=add_plan_button(build_watch_markup(
                               c["symbol"], in_manual=c["symbol"] in manual,
-                              in_auto=True))
+                              in_auto=True), c["symbol"]))
     # หุ้นเกรด A/B เข้า watchlist อัตโนมัติ → ได้เตือนทะลุแนว/วันงบต่อเอง
     added = auto_add([c["symbol"] for c in scan["candidates"]])
     if added:
@@ -240,7 +247,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "job วันนี้, รอตอบรับ, FMP 402, error, สแกนล่าสุด\n"
         "/hot (หรือพิมพ์ น่าสนใจ) — หุ้นที่ติดตามตัวไหนน่าสนใจตอนนี้:\n"
         "ใกล้ H5d/H3m ≤3%, เพิ่งทะลุ, งบ ≤3 วัน · หลุด SL/Low ก่อนงบ\n"
-        "คำสั่ง / ของคำสั่งไทย: /watch /unwatch /cal /dr /summary /stats\n\n"
+        "คำสั่ง / ของคำสั่งไทย: /watch /unwatch /cal /dr /plan /risk /summary /stats\n\n"
         "ดูราคารายตัว: พิมพ์ ticker ได้เลย เช่น NVDA\n"
         f"หลายตัวพร้อมกัน (สูงสุด {LOOKUP_MAX}): NVDA TSLA AAPL\n"
         "ได้ราคาปิดล่าสุด, %เปลี่ยน, วอลุ่ม, วันงบ,\n"
@@ -263,6 +270,12 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "dr NVDA — DR ไทยแพง/ถูกกว่าปกติแค่ไหน\n"
         "(ราคา DR/USDTHB สดจาก quote · premium เทียบ\n"
         "หุ้นแม่ × USDTHB, ทุก DR ของหุ้นนั้น)\n\n"
+        "แผน CRM (หรือ /plan CRM) — แผนเทรด 3 ทางเข้า:\n"
+        "① เข้าตอนนี้ ② ทะลุ High วันงบ ③ ย่อถึง D0 Open\n"
+        "SL = D0 Low · เป้า 1R/2R/3R · แปลงเป็นราคาบาท\n"
+        "+ จำนวนหน่วยต่อ DR (ปุ่ม 📋 ใต้ lookup/สแกนก็ได้)\n"
+        "เสี่ยง 1% ทุน 500000 (หรือ /risk ...) — ตั้งเงินเสี่ยง/ไม้\n"
+        "ให้แผนคิดจำนวนหน่วย · พิมพ์ เสี่ยง เฉย ๆ = ดูค่า\n\n"
         "งบ — ปฏิทินงบ universe วันนี้ + 2 วันข้างหน้า\n"
         "งบ 5 — ล่วงหน้า 5 วัน (สูงสุด 7) · งบวันนี้ — เฉพาะวันนี้\n"
         "(บอก BMO/AMC, 🇹🇭 มี DR, 📌 อยู่ใน watchlist)\n\n"
@@ -430,6 +443,119 @@ async def _handle_dr(update, tickers):
         await update.message.reply_text(msg)
 
 
+def _plan_dr_items(sym, drs):
+    """ข้อมูล DR ให้ build_plan (blocking — เรียกใน to_thread): implied ratio,
+    USDTHB (quote สด → close ล่าสุด), ราคา DR ล่าสุด, วอลุ่มเฉลี่ย 20 วัน
+
+    ทุก fetch ผ่าน Yahoo + cache คีย์เดียวกับรายงาน dr (ฟรี ไม่กินงบ FMP)
+    คืน (items, skipped) — skipped = DR ที่คู่ข้อมูลไม่พอ (ใหม่/เบาบาง/ดึงไม่ได้)
+    """
+    fx = fetch_cache.cached(
+        ("fx", "USDTHB"),
+        lambda: fetch_yahoo_prices("USDTHB=X", 120, raw=True))
+    us = get_prices(sym, 250)  # Yahoo (ไม่มี client → ไม่แตะ FMP) + cache
+    fx_quote = fetch_yahoo_quote("USDTHB=X", raw=True) or {}
+    fx_val = fx_quote.get("price") or (fx[0]["close"] if fx else None)
+    items, skipped = [], []
+    for d in drs:
+        dr_prices = fetch_cache.cached(
+            ("dr", d), lambda d=d: fetch_yahoo_prices(f"{d}.BK", 120, raw=True))
+        ratio = implied_ratio(dr_prices, us, fx)
+        if ratio is None or not fx_val:
+            skipped.append(d)
+            continue
+        items.append({"dr": d, "ratio": ratio, "fx": fx_val,
+                      "dr_price": dr_prices[0]["close"],
+                      "avg_volume": avg_volume(dr_prices)})
+    return items, skipped
+
+
+def _build_plan_message(client, sym, universe, risk):
+    """ข้อความแผนเทรดของหุ้นหนึ่งตัว (blocking — เรียกใน to_thread)
+
+    snapshot เดียวกับ lookup → เช็คว่ามี setup หลังงบ (plan_unavailable_reason)
+    → DR ผ่าน Yahoo (ล้ม/ไม่พอ = ยังได้แผนราคา US พร้อมหมายเหตุ ไม่ล้มทั้งข้อความ)
+    """
+    snap = lookup_symbol(client, sym, universe)
+    if snap is None:
+        return (f"❌ ไม่พบข้อมูล {sym} — เช็ค ticker เช่น NVDA / AAPL / BRK.B "
+                "(หรือแหล่งราคาสะดุดชั่วคราว ลองใหม่อีกครั้ง)")
+    reason = plan_unavailable_reason(snap)
+    if reason:
+        return f"📋 {sym}: {reason}"
+    drs = parse_dr_symbols(snap.get("dr_symbols"))
+    items, notes = [], []
+    if drs:
+        try:
+            items, skipped = _plan_dr_items(sym, drs)
+        except Exception:
+            logger.exception("plan dr %s failed", sym)
+            skipped = []
+            notes.append("⚠️ ดึงราคา DR ไม่ได้ — แสดงเฉพาะราคาหุ้นแม่ ลองใหม่อีกครั้ง")
+        if skipped:
+            notes.append(f"(DR ข้อมูลไม่พอ ไม่แสดง: {', '.join(skipped)})")
+    top, hidden = rank_drs(items)
+    plan = build_plan(snap, risk_amount=risk, drs=top)
+    msg = format_plan(plan, snap, hidden=hidden)
+    return "\n".join([msg, *notes]) if notes else msg
+
+
+async def _send_plans(bot, chat_id, tickers):
+    """แผนเทรดรายตัว (พิมพ์ "แผน CRM" / /plan / ปุ่ม 📋) — ใช้ร่วมกันข้อความ+ปุ่ม
+
+    เงินเสี่ยงจาก settings.json (ไม่ตั้ง = มีราคาบาทแต่ไม่มีจำนวนหน่วย)
+    แจ้ง ⏳ เฉพาะตอนต้องยิงเครือข่ายจริง (ราคาหุ้นแม่/แท่ง DR ยังไม่อยู่ใน cache)
+    """
+    universe = load_universe()
+    need_fetch = any(
+        fetch_cache.get(("prices", s, 250)) is None
+        or any(fetch_cache.get(("dr", d)) is None for d in
+               parse_dr_symbols((universe.get(s) or {}).get("dr_symbols")))
+        for s in tickers)
+    if need_fetch:
+        await bot.send_message(chat_id=chat_id,
+                               text=f"⏳ กำลังทำแผน {', '.join(tickers)}...")
+    client = FMPClient(api_key=CONFIG.fmp_api_key,
+                       max_api_calls=3 * len(tickers))
+    risk = risk_amount(load_settings())
+    await asyncio.to_thread(prefetch, tickers, 250, client)  # ดึงขนานก่อน
+    for sym in tickers:
+        try:
+            msg = await asyncio.to_thread(_build_plan_message, client, sym,
+                                          universe, risk)
+        except Exception:
+            logger.exception("plan %s failed", sym)
+            msg = f"⚠️ ทำแผน {sym} ล้มเหลว ลองใหม่อีกครั้งนะครับ"
+        await bot.send_message(chat_id=chat_id, text=msg)
+
+
+async def _handle_plan(update, context, tickers):
+    if not tickers:
+        await update.message.reply_text(
+            "ใช้: แผน <ticker> เช่น แผน CRM — แผนเทรด 3 ทางเข้า "
+            "(① เข้าตอนนี้ ② ทะลุ High วันงบ ③ ย่อถึง D0 Open) SL = D0 Low "
+            f"เป้า 1R/2R/3R + ราคาบาทและจำนวนหน่วยต่อ DR (สูงสุด {PLAN_MAX} ตัว)")
+        return
+    await _send_plans(context.bot, update.effective_chat.id, tickers)
+
+
+async def _handle_risk(update, changes):
+    """ตั้ง/ดูทุน + %เสี่ยงต่อไม้ (settings.json) — changes {} = ขอดูค่า"""
+    if not changes:
+        await update.message.reply_text(format_settings(load_settings()))
+        return
+    try:
+        settings = update_settings(changes)
+    except ValueError as e:                  # ค่าไม่สมเหตุสมผล (เช่น เสี่ยง 50%)
+        await update.message.reply_text(f"⚠️ {e}")
+        return
+    except Exception:
+        logger.exception("update settings failed")
+        await update.message.reply_text("⚠️ บันทึก settings.json ไม่ได้ ดู bot.log")
+        return
+    await update.message.reply_text("✅ บันทึกแล้ว\n" + format_settings(settings))
+
+
 async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """พิมพ์ ticker (ไม่ใช่คำสั่ง /) → snapshot ราคารายตัว · "ติดตาม ..." → watchlist"""
     if not _authorized(update):
@@ -501,6 +627,14 @@ async def _dispatch_text(update, context, text):
     if dr_cmd is not None:
         await _handle_dr(update, dr_cmd)
         return
+    plan_cmd = parse_plan_command(text)        # "แผน CRM" — ก่อน lookup ("PLAN" เข้ารูป ticker)
+    if plan_cmd is not None:
+        await _handle_plan(update, context, plan_cmd)
+        return
+    risk_cmd = parse_risk_command(text)        # "เสี่ยง 1% ทุน 500000" / "เสี่ยง" = ดูค่า
+    if risk_cmd is not None:
+        await _handle_risk(update, risk_cmd)
+        return
     watch = parse_watch_command(text)
     if watch:
         await _handle_watch_command(update, *watch)
@@ -537,6 +671,8 @@ async def _dispatch_text(update, context, text):
             all_symbols=tickers if all_row_pending else None)
         if all_row_pending:
             all_row_pending = False
+        if plan_unavailable_reason(snap) is None:   # มี setup หลังงบ → ปุ่ม 📋 แผนเทรด
+            markup = add_plan_button(markup, sym)
         await update.message.reply_text(format_lookup(snap),
                                         reply_markup=markup)
         await _send_chart(context.bot, update.effective_chat.id, sym,
@@ -791,7 +927,7 @@ async def _safe_answer(query, text=None):
 
 
 async def on_button(update, context):
-    """ปุ่ม inline: w:/wa: เพิ่ม watchlist · u: เอาออก
+    """ปุ่ม inline: w:/wa: เพิ่ม watchlist · u: เอาออก · p: ส่งแผนเทรด (ปุ่มคงอยู่ กดซ้ำได้)
 
     ลำดับสำคัญ: ทำงานจริงก่อน แล้วค่อย answer/edit — สองอย่างหลังล้มได้
     (query เก่า, ข้อความ >48 ชม. แก้ไม่ได้) โดยเจตนาผู้ใช้ต้องไม่สูญ
@@ -807,6 +943,14 @@ async def on_button(update, context):
         await _safe_answer(query)
         return
     action, syms = parsed
+    if action == "plan":
+        # งานยาว (ดึง DR) → answer ก่อนกัน query หมดอายุ · ไม่แก้ markup ปุ่มใช้ซ้ำได้
+        await _safe_answer(query, f"⏳ ทำแผน {syms[0]}")
+        try:
+            await _send_plans(context.bot, CONFIG.chat_id, syms)
+        except Exception:
+            logger.exception("plan button %s failed", syms)
+        return
     if action == "watch":
         r = add_symbols(syms)
         parts = []
@@ -841,6 +985,8 @@ BOT_COMMANDS = [
     ("cal", "ปฏิทินงบ universe วันนี้+2 วัน (ใส่เลข 0-7)"),
     ("scanlog", "สองเกณฑ์คู่กัน: 🇹🇭 SET (ปิด D0 ≥2% & vol ≥1.5× · 0-15 ⭐) + เดิม A/B → scan_log.csv (ใส่เลข = N วัน)"),
     ("dr", "DR ไทยแพง/ถูกกว่าหุ้นแม่แค่ไหน: /dr NVDA"),
+    ("plan", "แผนเทรด 3 ทางเข้า + SL/เป้า 1R-3R + ราคาบาท/จำนวนหน่วย DR: /plan CRM"),
+    ("risk", "ตั้งทุน/%เสี่ยงต่อไม้ให้ /plan คิดจำนวนหน่วย: /risk 1% ทุน 500000 · /risk = ดูค่า"),
     ("summary", "ผลหุ้นที่บอทแจ้งย้อนหลัง 30 วัน"),
     ("stats", "สถิติสะสมทุกสัญญาณ (win rate, drift, หลุด SL)"),
     ("status", "สุขภาพบอท: job วันนี้, รอตอบรับ, FMP 402, error"),
@@ -848,7 +994,8 @@ BOT_COMMANDS = [
 ]
 # slash → คำสั่งไทยเดิม (ส่งเข้า _dispatch_text) — /scan /status /help มี handler ตรงอยู่แล้ว
 SLASH_ALIASES = {"watch": "ติดตาม", "unwatch": "เลิกติดตาม", "hot": "น่าสนใจ",
-                 "summary": "สรุป", "stats": "สถิติ", "dr": "dr", "cal": "งบ"}
+                 "summary": "สรุป", "stats": "สถิติ", "dr": "dr", "cal": "งบ",
+                 "plan": "แผน", "risk": "เสี่ยง"}
 
 
 async def register_commands(app):

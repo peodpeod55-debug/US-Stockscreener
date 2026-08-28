@@ -1,4 +1,4 @@
-"""on_button: callback ปุ่มติดตาม/เลิกติดตาม — auth, ลำดับงาน, answer เสมอ, edit พังไม่ล้ม"""
+"""on_button: callback ปุ่มติดตาม/เลิกติดตาม/แผนเทรด — auth, ลำดับงาน, answer เสมอ, edit พังไม่ล้ม"""
 import asyncio
 from types import SimpleNamespace
 
@@ -6,7 +6,7 @@ from telegram import CallbackQuery, Update, User
 from telegram.ext import CallbackQueryHandler
 
 import bot.main as m
-from bot.buttons import build_unwatch_markup, build_watch_markup
+from bot.buttons import add_plan_button, build_unwatch_markup, build_watch_markup
 from bot.config import Config
 from bot.main import build_app, on_button
 
@@ -138,3 +138,28 @@ def test_no_markup_on_message_skips_edit(monkeypatch):
 
 def test_on_button_none_query_returns():
     asyncio.run(on_button(SimpleNamespace(callback_query=None), None))
+
+
+def test_plan_button_sends_plan_and_keeps_button(monkeypatch):
+    """p:EL — answer ก่อน (งานยาว ดึง DR) แล้วส่งแผนเป็นข้อความใหม่ · ไม่แก้ markup ปุ่มกดซ้ำได้"""
+    monkeypatch.setattr(m, "CONFIG", DUMMY_CONFIG)
+    sent = []
+
+    async def fake_send(bot, chat_id, syms):
+        sent.append((bot, chat_id, syms))
+    monkeypatch.setattr(m, "_send_plans", fake_send)
+    q = FakeQuery("p:EL", markup=add_plan_button(build_watch_markup("EL"), "EL"))
+    asyncio.run(on_button(SimpleNamespace(callback_query=q), SimpleNamespace(bot="B")))
+    assert q.log == ["answer"] and q.edits == []
+    assert sent == [("B", "1", ["EL"])]
+
+
+def test_plan_button_failure_swallowed(monkeypatch):
+    monkeypatch.setattr(m, "CONFIG", DUMMY_CONFIG)
+
+    async def boom(bot, chat_id, syms):
+        raise RuntimeError("yahoo down")
+    monkeypatch.setattr(m, "_send_plans", boom)
+    q = FakeQuery("p:EL", markup=add_plan_button(None, "EL"))
+    asyncio.run(on_button(SimpleNamespace(callback_query=q), SimpleNamespace(bot="B")))
+    assert q.log == ["answer"]

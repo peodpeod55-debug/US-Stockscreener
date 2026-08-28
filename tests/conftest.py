@@ -1,6 +1,6 @@
 import pytest
 
-from bot import earnings_store, fetch_cache, pending, prices, signals
+from bot import earnings_store, fetch_cache, pending, prices, settings, signals
 
 
 @pytest.fixture(autouse=True)
@@ -29,6 +29,12 @@ def _isolate_earnings_store(tmp_path, monkeypatch):
     ต้องไม่เขียนทับ และ lookup ต้องไม่เห็นวันงบจริง"""
     monkeypatch.setattr(earnings_store, "STORE_PATH",
                         tmp_path / "earnings_calendar.json")
+
+
+@pytest.fixture(autouse=True)
+def _isolate_settings(tmp_path, monkeypatch):
+    """settings.json (ทุน/%เสี่ยง) เป็นค่าจริงของ user — เทส /risk ต้องไม่เขียนทับ"""
+    monkeypatch.setattr(settings, "SETTINGS_PATH", tmp_path / "settings.json")
 
 
 @pytest.fixture(autouse=True)

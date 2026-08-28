@@ -174,5 +174,23 @@ def test_help_lists_slash_aliases(monkeypatch):
     monkeypatch.setattr(m, "CONFIG", DUMMY_CONFIG)
     update, replies = _fake_update("/help")
     asyncio.run(m.cmd_help(update, SimpleNamespace(bot=None, args=[])))
-    for cmd in ("/hot", "/watch", "/unwatch", "/cal", "/dr", "/summary", "/stats"):
+    for cmd in ("/hot", "/watch", "/unwatch", "/cal", "/dr", "/plan", "/risk",
+                "/summary", "/stats"):
         assert cmd in replies[0], cmd
+
+
+def test_plan_and_risk_aliases(monkeypatch):
+    calls = []
+
+    async def fake_plan(update, context, tickers):
+        calls.append(("plan", tickers))
+
+    async def fake_risk(update, changes):
+        calls.append(("risk", changes))
+    fakes = {"_handle_plan": fake_plan, "_handle_risk": fake_risk}
+    _run_alias(monkeypatch, "/plan CRM", fakes)
+    _run_alias(monkeypatch, "/plan", fakes)
+    _run_alias(monkeypatch, "/risk 1% ทุน 500000", fakes)
+    _run_alias(monkeypatch, "/risk", fakes)
+    assert calls == [("plan", ["CRM"]), ("plan", []),
+                     ("risk", {"risk_pct": 1.0, "capital_thb": 500000.0}), ("risk", {})]

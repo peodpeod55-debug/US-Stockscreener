@@ -1,7 +1,8 @@
 """ปุ่ม inline ติดตาม/เลิกติดตาม — builders, parse callback data, แปลง markup หลังกด
 
 callback data (จำกัด 64 bytes ต่อปุ่ม): `w:<SYM>` เพิ่มตัวเดียว ·
-`wa:<SYM,SYM,...>` เพิ่มทั้งชุด · `u:<SYM>` เอาออก · `-` = ปุ่มปลดชนวนแล้ว (noop)
+`wa:<SYM,SYM,...>` เพิ่มทั้งชุด · `u:<SYM>` เอาออก · `p:<SYM>` ส่งแผนเทรด
+(ปุ่มคงอยู่ กดซ้ำได้ — ราคาเปลี่ยนทุกวัน) · `-` = ปุ่มปลดชนวนแล้ว (noop)
 """
 import re
 
@@ -62,14 +63,24 @@ def build_unwatch_markup(symbols):
     return InlineKeyboardMarkup(rows) if rows else None
 
 
+def add_plan_button(markup, symbol):
+    """ต่อแถวปุ่ม 📋 แผนเทรด ใต้ markup เดิม (None = ปุ่มเดียว) — ไม่ปลดชนวนหลังกด"""
+    rows = [list(r) for r in markup.inline_keyboard] if markup else []
+    rows.append([InlineKeyboardButton(f"📋 แผนเทรด {symbol}",
+                                      callback_data=f"p:{symbol}")])
+    return InlineKeyboardMarkup(rows)
+
+
 def parse_callback(data):
-    """แปลง callback data → ("watch"|"unwatch", [symbols]) หรือ None ถ้าไม่รู้จัก/ปลอม"""
+    """แปลง callback data → ("watch"|"unwatch"|"plan", [symbols]) หรือ None ถ้าไม่รู้จัก/ปลอม"""
     if data.startswith("w:"):
         action, syms = "watch", [data[2:]]
     elif data.startswith("wa:"):
         action, syms = "watch", data[3:].split(",")
     elif data.startswith("u:"):
         action, syms = "unwatch", [data[2:]]
+    elif data.startswith("p:"):
+        action, syms = "plan", [data[2:]]
     else:
         return None
     if not all(_TICKER_RE.match(s) for s in syms):

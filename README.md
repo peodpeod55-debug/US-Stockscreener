@@ -11,7 +11,7 @@ High 5 วันก่อนงบ, High 3 เดือนก่อนงบ, Hi
   — ปิดหลุด Low ก่อนงบ = setup จบ หุ้นติดตามอัตโนมัติถูกเอาออกเอง · พิมพ์ `ติดตาม` เห็นแนวรายตัว (H5d/H3m/SL/Low ก่อนงบ)
 - **Catch-up**: เปิดเครื่องหลังเวลา job เช้า → บอทรันรอบที่พลาดชดเชยให้เอง (กันซ้ำด้วย `job_state.json`)
   · หุ้นที่ยังรอวันตอบรับ (เช่น งบ AMC วันศุกร์) จำไว้ใน `pending.json` แล้วเช็คต่อทุกรอบจนได้เกรด แม้หลุดหน้าต่างปฏิทิน 2 วันไปแล้ว
-- **สั่งเอง** (เมนู `/` ใน Telegram ลงทะเบียนเองตอนบอท start): `/scan` (ย้อนหลัง 2 วัน), `/scan 7`, `/hot` (หุ้นที่ติดตามตัวไหนน่าสนใจตอนนี้ — ใกล้ H5d/H3m ≤3%, เพิ่งทะลุ, งบ ≤3 วัน, หลุด SL/Low ก่อนงบ), `/watch [ticker]`, `/unwatch <ticker>`, `/cal [0-7]`, `/scanlog [N]` (หรือ `สแกนล็อก`: สองเกณฑ์คู่กัน — 🇹🇭 SET ปิด D0 ≥2% & vol ≥1.5× คะแนน 0–15 ⭐ คิดสด + เดิม A/B), `/dr <ticker>`, `/summary`, `/stats`, `/status` (รันอยู่ไหม/โค้ดตรง HEAD ไหม, job วันนี้, รอตอบรับ, FMP 402, error, สแกนล่าสุด), `/help` — คำสั่งไทยเดิม (`ติดตาม`, `น่าสนใจ`, `งบ`, `dr`, `สรุป`, `สถิติ`, `สถานะ`) ใช้ได้เหมือนเดิม
+- **สั่งเอง** (เมนู `/` ใน Telegram ลงทะเบียนเองตอนบอท start): `/scan` (ย้อนหลัง 2 วัน), `/scan 7`, `/hot` (หุ้นที่ติดตามตัวไหนน่าสนใจตอนนี้ — ใกล้ H5d/H3m ≤3%, เพิ่งทะลุ, งบ ≤3 วัน, หลุด SL/Low ก่อนงบ), `/watch [ticker]`, `/unwatch <ticker>`, `/cal [0-7]`, `/scanlog [N]` (หรือ `สแกนล็อก`: สองเกณฑ์คู่กัน — 🇹🇭 SET ปิด D0 ≥2% & vol ≥1.5× คะแนน 0–15 ⭐ คิดสด + เดิม A/B), `/dr <ticker>`, `/plan <ticker>` (หรือ `แผน CRM` / ปุ่ม 📋 ใต้ lookup และกราฟผลสแกน: แผนเทรด 3 ทางเข้า ① เข้าตอนนี้ ② ทะลุ High วันงบ ③ ย่อถึง D0 Open · SL = D0 Low · เป้า 1R/2R/3R · แปลงเป็นราคาบาท + จำนวนหน่วยต่อ DR ผ่าน implied ratio), `/risk 1% ทุน 500000` (หรือ `เสี่ยง ...`: ตั้งทุน/%เสี่ยงต่อไม้ให้แผนคิดจำนวนหน่วย — เก็บใน `settings.json` gitignored · `/risk` เฉย ๆ = ดูค่า), `/summary`, `/stats`, `/status` (รันอยู่ไหม/โค้ดตรง HEAD ไหม, job วันนี้, รอตอบรับ, FMP 402, error, สแกนล่าสุด), `/help` — คำสั่งไทยเดิม (`ติดตาม`, `น่าสนใจ`, `งบ`, `dr`, `แผน`, `เสี่ยง`, `สรุป`, `สถิติ`, `สถานะ`) ใช้ได้เหมือนเดิม
 - **`scan_log.csv` ให้ gem-lab** (28 ส.ค. 2026 — port จาก HK Stock Screener): ทั้ง `/scanlog` และ job สแกน 08:30 เขียนไฟล์นี้ (root, track ใน git) ใน **schema เดียวกับ `scan_log.csv` ของ Set screnner** + คอลัมน์ `grade` ท้ายสุด (`scan_date,ticker,earn_date,reaction_pct,reaction_vol_ratio,since_earn_pct,price,broke_5d_high,broke_3m_high,days_since_new_high,pre_earn_low,above_pre_low,score,grade`) · `ticker` = `NVDA` ไม่มีนามสกุล (gem-lab ต้องรู้ตลาดจาก config ของไฟล์) · `score` = คะแนน SET 0–15 (`bot/set_score.py` port `signal_score` ของไทยตัวต่อตัว) คิดสด ณ วันเขียน · แถว = ตัวที่ผ่านด่าน SET หรือเข้าเกณฑ์เดิม A/B · หนึ่งแถวต่อ (scan_date, ticker) รอบหลังทับรอบก่อน · utf-8-sig เปิด Excel ได้ · ไฟล์ถูกล็อก → log เตือน ไม่ล้มสแกน · ไม่แตะ signals.json/auto-watch · `run_scan` คืน `rows` (ทุกตัวที่มีแท่ง D0 รวม down/C/D พร้อม `set_hit`/`set_pts`) ให้ทั้งสองทางใช้
 
 ## ติดตั้งครั้งแรก
@@ -77,6 +77,9 @@ bot/
 ├── prices.py        ราคา EOD: cache → Yahoo (หลัก) → FMP (สำรอง) + prefetch ขนาน
 ├── earnings_store.py คลังวันงบสะสม earnings_calendar.json (NASDAQ/FMP/Finnhub) — อ่านก่อนยิง FMP รายตัว
 ├── levels.py        ระดับราคา (5d/3M/week high, new-high freq, SL)
+├── dr.py            DR premium + implied ratio (DR/(US×USDTHB)) ใช้ร่วมกับ plan
+├── plan.py          แผนเทรด 3 ทางเข้า + แปลงเป็นราคาบาท/จำนวนหน่วย DR (pure)
+├── settings.py      ทุน/%เสี่ยงต่อไม้ → settings.json (gitignored)
 ├── formatter.py     ข้อความ Telegram ภาษาไทย
 ├── config.py        อ่าน .env
 ├── get_chat_id.py   helper หา chat_id
@@ -100,4 +103,5 @@ python -m pytest -q
 - **วันงบ**: ปฏิทินรวม FMP (1 call) + NASDAQ (ฟรี) + Finnhub (ถ้ามี key) ทุกแถวลง `earnings_calendar.json` (gitignored)
   → เตือนวันงบ / `/hot` "งบใกล้" / lookup อ่านจากคลังก่อน ไม่ยิง FMP รายตัว (402) · job เช้าดึงล่วงหน้า 7 วัน, อาทิตย์ดึงถึง 35 วัน
 - API FMP ต่อวัน ≈ 2–3 call (ปฏิทิน) → free tier 250 calls/วัน เหลือเฟือ
+- `settings.json` (ทุน/%เสี่ยง), `watchlist.json`, `auto_watch.json` เป็นข้อมูลส่วนตัว gitignored — ย้ายเครื่องต้องตั้งใหม่ (`/risk`, `ติดตาม`)
 - Log อยู่ที่ `bot.log`
