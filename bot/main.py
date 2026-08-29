@@ -1,7 +1,7 @@
 """Telegram bot entry: /scan /help + daily push อังคาร–เสาร์ 08:30 Asia/Bangkok"""
 import asyncio
 import logging
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from logging.handlers import RotatingFileHandler
 from zoneinfo import ZoneInfo
 
