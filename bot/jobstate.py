@@ -22,6 +22,11 @@ SCHEDULE = [
     ("weekly", time(9, 0), {6}),
 ]
 
+# ขอบบนของหน้าต่าง catch-up — ตลาด US เปิดเร็วสุด 20:30 ไทย (ช่วง DST) แล้วแท่ง [0]
+# จาก Yahoo กลายเป็นแท่ง intraday ยังไม่ปิด: breakout/scan จะอ่านค่าเพี้ยนแล้วเขียน
+# state ถาวร (record_breakouts / auto_remove) — เปิดเครื่องดึกให้รอรันรุ่งเช้าตามปกติแทน
+CATCHUP_UNTIL = time(20, 0)
+
 
 def _load(path):
     try:
@@ -62,6 +67,10 @@ def release(job, path=JOB_STATE_PATH, today=None):
 
 
 def due_catchup(now):
-    """job ที่ถึงเวลาแล้ววันนี้ (ตามวัน+เวลาใน SCHEDULE) — ตัวกรองซ้ำอยู่ที่ claim"""
+    """job ที่ถึงเวลาแล้ววันนี้ (ตามวัน+เวลาใน SCHEDULE) — ตัวกรองซ้ำอยู่ที่ claim
+
+    เลย CATCHUP_UNTIL แล้วคืนว่างเสมอ (ดูคอมเมนต์บนค่าคงที่)"""
+    if now.time() >= CATCHUP_UNTIL:
+        return []
     return [name for name, t, days in SCHEDULE
             if now.weekday() in days and now.time() >= t]

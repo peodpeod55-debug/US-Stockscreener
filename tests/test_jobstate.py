@@ -87,3 +87,16 @@ def test_sunday_has_reminder_and_weekly_only():
 def test_monday_reminder_only():
     # จันทร์ไม่ใช่วัน push (ตลาด US หยุดเสาร์-อาทิตย์) แต่เตือนวันงบรันทุกวัน
     assert due_catchup(datetime(2026, 8, 24, 9, 30)) == ["reminder"]
+
+
+def test_evening_us_session_nothing_due():
+    # อังคาร 21:00 — ตลาด US เปิดอยู่ แท่ง [0] จาก Yahoo ยังไม่ปิด
+    # ห้าม catch-up job เช้า (breakout/scan จะเขียน state ถาวรจากแท่งครึ่งวัน)
+    assert due_catchup(datetime(2026, 8, 18, 21, 0)) == []
+
+
+def test_catchup_window_upper_bound():
+    # 19:59 ยังเก็บตกได้ · 20:00 ปิดหน้าต่าง (ตลาด US เปิดเร็วสุด 20:30 ไทยช่วง DST)
+    assert due_catchup(datetime(2026, 8, 18, 19, 59)) == [
+        "breakout", "reminder", "scan"]
+    assert due_catchup(datetime(2026, 8, 18, 20, 0)) == []
