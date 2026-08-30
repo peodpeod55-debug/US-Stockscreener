@@ -14,6 +14,7 @@ class Config:
     chat_id: str
     fmp_api_key: str
     lookback_days: int = 2
+    scanlog_lookback_days: int = 7     # /scanlog เปล่าๆ ย้อนหลังกี่วัน — แยกจาก /scan และสแกน 08:30
     max_api_calls: int = 200
     finnhub_api_key: str = ""      # ตัวเลือก: ปฏิทินงบ Finnhub (timing bmo/amc)
 
@@ -30,6 +31,7 @@ def load_config(env_path: Path | None = None) -> Config:
         chat_id=os.environ["TELEGRAM_CHAT_ID"],
         fmp_api_key=os.environ["FMP_API_KEY"],
         lookback_days=int(os.environ.get("SCAN_LOOKBACK_DAYS", "2")),
+        scanlog_lookback_days=int(os.environ.get("SCANLOG_LOOKBACK_DAYS", "7")),
         max_api_calls=int(os.environ.get("MAX_API_CALLS", "200")),
         finnhub_api_key=os.environ.get("FINNHUB_API_KEY", "").strip(),
     )

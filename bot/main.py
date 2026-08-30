@@ -201,7 +201,7 @@ async def _run_scanlog(update, context, lookback):
 async def cmd_scanlog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not _authorized(update):
         return
-    lookback = CONFIG.lookback_days
+    lookback = CONFIG.scanlog_lookback_days
     if context.args:
         try:
             lookback = max(1, min(30, int(context.args[0])))
@@ -237,7 +237,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/scan — สแกนย้อนหลัง 2 วัน\n"
         "/scan 7 — สแกนย้อนหลัง 7 วัน\n"
         "/scanlog (หรือพิมพ์ สแกนล็อก) — สองเกณฑ์คู่กัน: 🇹🇭 SET (ปิด D0 ≥2% & vol ≥1.5× · คะแนน 0-15 ⭐) + เดิม A/B\n"
-        "  แถวเดียวกันลง scan_log.csv (schema ไทย + grade) ให้ gem-lab · /scanlog 7\n"
+        "  แถวเดียวกันลง scan_log.csv (schema ไทย + grade) ให้ gem-lab\n"
+        "  ค่าเริ่มต้นย้อนหลัง 7 วัน · ใส่เลขเองได้ 1-30 เช่น /scanlog 14\n"
         "/help — วิธีใช้\n"
         "/status (หรือพิมพ์ สถานะ) — สุขภาพบอท: รันอยู่ไหม/ต้อง restart ไหม,\n"
         "job วันนี้, รอตอบรับ, FMP 402, error, สแกนล่าสุด\n"
@@ -606,7 +607,7 @@ async def _dispatch_text(update, context, text):
         return
     words = text.strip().split()
     if words and words[0].lower() in ("สแกนล็อก", "สองเกณฑ์", "scanlog"):
-        lookback = CONFIG.lookback_days
+        lookback = CONFIG.scanlog_lookback_days
         if len(words) > 1 and words[1].isdigit():
             lookback = max(1, min(30, int(words[1])))
         await _run_scanlog(update, context, lookback)

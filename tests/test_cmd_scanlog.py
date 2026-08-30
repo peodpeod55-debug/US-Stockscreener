@@ -134,12 +134,13 @@ def test_cmd_scanlog_bad_arg_replies_usage(monkeypatch):
 
 
 def test_cmd_scanlog_default_lookback_and_clamp(monkeypatch):
+    """/scanlog เปล่าๆ = 7 วัน (default แยกจาก /scan ที่ 2 วัน) · เกิน 30 บีบเหลือ 30"""
     calls, _ = _setup(monkeypatch)
     update, msg = _update()
     asyncio.run(main.cmd_scanlog(update, SimpleNamespace(args=[], bot=FakeBot())))
     asyncio.run(main.cmd_scanlog(update, SimpleNamespace(args=["90"], bot=FakeBot())))
-    assert calls == [DUMMY_CONFIG.lookback_days, 30]
-    assert msg.replies[0].startswith("🔍 กำลังสแกน + คิดคะแนน SET ย้อนหลัง 2 วัน")
+    assert calls == [7, 30]
+    assert msg.replies[0].startswith("🔍 กำลังสแกน + คิดคะแนน SET ย้อนหลัง 7 วัน")
 
 
 def test_cmd_scanlog_unauthorized_silent(monkeypatch):
@@ -154,3 +155,20 @@ def test_thai_keyword_routes_to_scanlog(monkeypatch):
     update, msg = _update("สแกนล็อก 5")
     asyncio.run(main.on_text(update, SimpleNamespace(args=[], bot=FakeBot())))
     assert calls == [5]
+
+
+def test_thai_keyword_default_lookback_is_scanlog_default(monkeypatch):
+    """พิมพ์ "สแกนล็อก" เปล่าๆ ต้องได้ default ของ scanlog (7) ไม่ใช่ของ /scan (2)"""
+    calls, _ = _setup(monkeypatch)
+    update, msg = _update("สแกนล็อก")
+    asyncio.run(main.on_text(update, SimpleNamespace(args=[], bot=FakeBot())))
+    assert calls == [7]
+
+
+def test_config_scanlog_lookback_default_and_env(monkeypatch):
+    assert Config(telegram_token="t", chat_id="1", fmp_api_key="k").scanlog_lookback_days == 7
+    for k, v in {"TELEGRAM_BOT_TOKEN": "t", "TELEGRAM_CHAT_ID": "1", "FMP_API_KEY": "k",
+                 "SCANLOG_LOOKBACK_DAYS": "14"}.items():
+        monkeypatch.setenv(k, v)
+    from bot.config import load_config
+    assert load_config().scanlog_lookback_days == 14
