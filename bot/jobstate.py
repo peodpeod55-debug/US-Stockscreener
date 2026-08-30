@@ -66,6 +66,30 @@ def release(job, path=JOB_STATE_PATH, today=None):
     return True
 
 
+def last_run(job, path=None):
+    """วันล่าสุดที่ job นี้ claim ไป (date) — ไม่เคย/ไฟล์เสีย/ค่าเพี้ยน → None
+
+    ต้องอ่าน *ก่อน* claim ของวันนี้ (claim ทับค่าเดิม) — daily_job ใช้คำนวณช่วงที่เครื่องหายไป
+    path อ่านจากโมดูล ณ เวลาเรียก (ไม่ผูกตอน def) — conftest redirect ในเทสคุมถึง
+    """
+    raw = _load(JOB_STATE_PATH if path is None else path).get(job)
+    try:
+        return date.fromisoformat(raw) if raw else None
+    except ValueError:
+        return None
+
+
+def widen_lookback(base, last, today, cap=14):
+    """หน้าต่างสแกนย้อนหลัง — เครื่องปิดหลายวันให้ย้อนครอบวันที่หายไป (สูงสุด cap)
+
+    last = วันสแกนสำเร็จล่าสุด (None = ไม่เคย → ใช้ base ตามปกติ ไม่เหมาย้อนยาว)
+    แถวซ้ำกับที่เคยสแกนไม่เป็นไร — scan_log.csv upsert ต่อ (scan_date, ticker) อยู่แล้ว
+    """
+    if last is None:
+        return base
+    return max(base, min((today - last).days, cap))
+
+
 def due_catchup(now):
     """job ที่ถึงเวลาแล้ววันนี้ (ตามวัน+เวลาใน SCHEDULE) — ตัวกรองซ้ำอยู่ที่ claim
 

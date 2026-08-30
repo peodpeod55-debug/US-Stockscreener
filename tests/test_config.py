@@ -41,6 +41,23 @@ def test_finnhub_key_is_optional(tmp_path, monkeypatch):
     assert load_config(env).finnhub_api_key == "fh-key"
 
 
+def test_rescore_settings_default_and_override(tmp_path, monkeypatch):
+    """เกณฑ์ไทยมีชีวิต: SET_QUALIFY_MIN (ข้ามเกณฑ์แจ้งครั้งแรก) + RESCORE_DAYS (กรอบคิดซ้ำ)"""
+    for k in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "FMP_API_KEY",
+              "SET_QUALIFY_MIN", "RESCORE_DAYS"):
+        monkeypatch.delenv(k, raising=False)
+    env = tmp_path / ".env"
+    env.write_text("TELEGRAM_BOT_TOKEN=tok\nTELEGRAM_CHAT_ID=1\nFMP_API_KEY=f\n")
+    cfg = load_config(env)
+    assert cfg.set_qualify_min == 10
+    assert cfg.rescore_days == 14
+    env.write_text("TELEGRAM_BOT_TOKEN=tok\nTELEGRAM_CHAT_ID=1\nFMP_API_KEY=f\n"
+                   "SET_QUALIFY_MIN=12\nRESCORE_DAYS=7\n")
+    cfg = load_config(env)
+    assert cfg.set_qualify_min == 12
+    assert cfg.rescore_days == 7
+
+
 def test_load_config_missing_raises(tmp_path, monkeypatch):
     for k in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "FMP_API_KEY"):
         monkeypatch.delenv(k, raising=False)

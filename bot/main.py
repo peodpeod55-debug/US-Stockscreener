@@ -16,7 +16,7 @@ from telegram.ext import (
     filters,
 )
 
-from bot import fetch_cache, instance_lock
+from bot import fetch_cache, instance_lock, rescore
 from bot.breakouts import record_breakouts
 from bot.buttons import (
     add_plan_button,
@@ -54,7 +54,8 @@ from bot.formatter import (
 )
 from bot.hot import classify_watch
 from bot.levels import below_low_5d
-from bot.jobstate import PUSH_WEEKDAYS, already_ran, claim, due_catchup, release
+from bot.jobstate import (PUSH_WEEKDAYS, already_ran, claim, due_catchup,
+                          last_run, release, widen_lookback)
 from bot.openbell import build_open_report, fetch_quote, fetch_yahoo_quote, in_open_window
 from bot.lookup import LOOKUP_MAX, SET_RULE, lookup_symbol, parse_tickers
 from bot.nasdaq_cal import fetch_nasdaq_earnings
@@ -140,7 +141,12 @@ async def _do_scan_and_send(bot, chat_id, lookback):
     save_reports(scan, messages)
     # บันทึกสัญญาณ A/B ลง signals.json (dedup ต่อรอบงบ) — ฐานของสรุปรายสัปดาห์
     record_signals(scan["candidates"], scan["to_date"])
-    _record_scan_csv(scan)                      # scan_log.csv (schema ไทย + grade) ให้ gem-lab
+    rows, scored = _record_scan_csv(scan)       # scan_log.csv (schema ไทย + grade) ให้ gem-lab
+    # เกณฑ์ไทยมีชีวิต 14 วัน: คิดคะแนน SET ซ้ำตัวเก่าในกรอบ + หาตัวเพิ่งข้ามเกณฑ์ครั้งแรก (bot/rescore.py)
+    crossed = await asyncio.to_thread(
+        rescore.run, rows, scored, lambda s: get_prices(s, 250),
+        date.fromisoformat(scan["to_date"]), CONFIG.set_qualify_min,
+        CONFIG.rescore_days)
     # ปุ่มรวม "ติดตามถาวรทั้งหมด" ใต้ข้อความสแกนฉบับสุดท้าย (มี candidate ≥2)
     manual = set(load_watchlist())
     all_markup = build_watch_all_markup(
@@ -158,8 +164,16 @@ async def _do_scan_and_send(bot, chat_id, lookback):
                           reply_markup=add_plan_button(build_watch_markup(
                               c["symbol"], in_manual=c["symbol"] in manual,
                               in_auto=True), c["symbol"]))
-    # หุ้นเกรด A/B เข้า watchlist อัตโนมัติ → ได้เตือนทะลุแนว/วันงบต่อเอง
-    added = auto_add([c["symbol"] for c in scan["candidates"]])
+    # ตัวข้ามเกณฑ์ไทยที่ไม่อยู่ในลิสต์ A/B วันนี้ (แจ้งไปแล้วในข้อความสแกน) — แจ้งแยกสั้น ๆ
+    cand_syms = [c["symbol"] for c in scan["candidates"]]
+    note = rescore.format_crossed(
+        [c for c in crossed if c["symbol"] not in set(cand_syms)],
+        CONFIG.set_qualify_min)
+    if note:
+        await bot.send_message(chat_id=chat_id, text=note)
+    # หุ้นเกรด A/B + ตัวข้ามเกณฑ์ไทย เข้า watchlist อัตโนมัติ → ได้เตือนทะลุแนว/วันงบต่อเอง
+    added = auto_add(cand_syms + [c["symbol"] for c in crossed
+                                  if c["symbol"] not in cand_syms])
     if added:
         await bot.send_message(
             chat_id=chat_id,
@@ -896,9 +910,12 @@ async def daily_job(context: ContextTypes.DEFAULT_TYPE):
     # job ตั้งรันทุกวัน แล้วเช็ควันในนี้เอง (กันความกำกวมเรื่อง days ของ JobQueue)
     if datetime.now(TZ).weekday() not in PUSH_WEEKDAYS:
         return
+    # เครื่องปิดหลายวัน → ย้อนหน้าต่างสแกนครอบวันที่หายไป (ต้องอ่านก่อน claim จะทับค่าเดิม)
+    lookback = widen_lookback(CONFIG.lookback_days, last_run("scan"),
+                              datetime.now(TZ).date(), cap=CONFIG.rescore_days)
     await _run_claimed(context, "scan",
                        lambda: _do_scan_and_send(context.bot, CONFIG.chat_id,
-                                                 CONFIG.lookback_days))
+                                                 lookback))
 
 
 async def catchup_job(context: ContextTypes.DEFAULT_TYPE):

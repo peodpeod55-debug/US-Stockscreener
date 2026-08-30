@@ -1,6 +1,7 @@
 from datetime import date, datetime
 
-from bot.jobstate import already_ran, claim, due_catchup, release
+from bot.jobstate import (already_ran, claim, due_catchup, last_run, release,
+                          widen_lookback)
 
 TUE = date(2026, 8, 18)
 WED = date(2026, 8, 19)
@@ -100,3 +101,27 @@ def test_catchup_window_upper_bound():
     assert due_catchup(datetime(2026, 8, 18, 19, 59)) == [
         "breakout", "reminder", "scan"]
     assert due_catchup(datetime(2026, 8, 18, 20, 0)) == []
+
+
+# ── last_run / widen_lookback (เครื่องปิดหลายวัน → สแกนย้อนให้ครอบ) ──
+
+def test_last_run_reads_claimed_date(tmp_path):
+    p = tmp_path / "job_state.json"
+    assert last_run("scan", path=p) is None
+    claim("scan", path=p, today=TUE)
+    assert last_run("scan", path=p) == TUE
+
+
+def test_last_run_ignores_corrupt_value(tmp_path):
+    p = tmp_path / "job_state.json"
+    p.write_text('{"scan": "not-a-date"}', encoding="utf-8")
+    assert last_run("scan", path=p) is None
+
+
+def test_widen_lookback_covers_downtime_gap():
+    today = date(2026, 8, 18)
+    assert widen_lookback(2, None, today) == 2              # ไม่เคยรัน → ค่าปกติ
+    assert widen_lookback(2, date(2026, 8, 17), today) == 2  # เมื่อวานรัน → ค่าปกติ
+    assert widen_lookback(2, date(2026, 8, 13), today) == 5  # หาย 5 วัน → ย้อน 5
+    assert widen_lookback(2, date(2026, 7, 1), today) == 14  # หายนาน → เพดาน 14
+    assert widen_lookback(2, date(2026, 7, 1), today, cap=7) == 7

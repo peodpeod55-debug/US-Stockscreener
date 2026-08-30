@@ -1,6 +1,7 @@
 import pytest
 
-from bot import earnings_store, fetch_cache, pending, prices, settings, signals
+from bot import (earnings_store, fetch_cache, jobstate, pending, prices,
+                 rescore, scan_csv, settings, signals)
 
 
 @pytest.fixture(autouse=True)
@@ -35,6 +36,15 @@ def _isolate_earnings_store(tmp_path, monkeypatch):
 def _isolate_settings(tmp_path, monkeypatch):
     """settings.json (ทุน/%เสี่ยง) เป็นค่าจริงของ user — เทส /risk ต้องไม่เขียนทับ"""
     monkeypatch.setattr(settings, "SETTINGS_PATH", tmp_path / "settings.json")
+
+
+@pytest.fixture(autouse=True)
+def _isolate_rescore(tmp_path, monkeypatch):
+    """rescore_state.json / scan_log.csv / job_state.json (ผ่าน last_run) เป็น state จริงของเครื่อง —
+    rescore.run และ last_run อ่าน path จาก attribute ของโมดูล ณ เวลาเรียก redirect ตรงนี้จึงคุมถึง"""
+    monkeypatch.setattr(rescore, "STATE_PATH", tmp_path / "rescore_state.json")
+    monkeypatch.setattr(scan_csv, "SCAN_CSV_PATH", tmp_path / "scan_log.csv")
+    monkeypatch.setattr(jobstate, "JOB_STATE_PATH", tmp_path / "job_state.json")
 
 
 @pytest.fixture(autouse=True)

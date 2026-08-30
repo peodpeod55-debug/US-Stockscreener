@@ -11,3 +11,4 @@ bot.log
 pending.json
 earnings_calendar.json
 settings.json
+rescore_state.json
