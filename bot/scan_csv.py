@@ -55,7 +55,8 @@ def csv_row(row, scored, scan_date):
     """แถว CSV จากแถวสแกน + คะแนนสด (None = ดึงราคาไม่ได้ → ใช้ set_pts ณ วันสแกน เว้นช่องที่คิดไม่ได้)"""
     s = scored or {}
     pts = s.get("pts") if scored else row.get("set_pts")
-    day = scan_date.isoformat() if hasattr(scan_date, "isoformat") else str(scan_date)
+    # วันที่แถว = วันแท่งจริงที่คิดคะแนน (asof) — รันวันหยุดจะทับแถวเดิม ไม่เกิดแถวผี (เคส HK 30 ส.ค.)
+    day = s.get("asof") or (scan_date.isoformat() if hasattr(scan_date, "isoformat") else str(scan_date))
     return [
         day, csv_ticker(row["symbol"]), row.get("earnings_date") or "",
         _f2(row.get("ret_d0_pct")), _f2(row.get("vol_ratio")), _f2(s.get("since_pct")), _f2(s.get("price")),

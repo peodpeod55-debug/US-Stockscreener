@@ -134,6 +134,12 @@ async def _send_chart(bot, chat_id, symbol, levels=None, caption=None,
         logger.exception("chart %s failed", symbol)
 
 
+def _us_market_maybe_open(t):
+    """ช่วงที่แท่ง "วันนี้" จาก Yahoo อาจยังเป็น intraday ไม่ปิด — ตลาด US เปิดเร็วสุด 20:30 ไทย
+    (DST) ปิดช้าสุด ~04:00 เผื่อขอบถึง 05:00 (เหตุผลเดียวกับ jobstate.CATCHUP_UNTIL)"""
+    return t >= time(20, 0) or t < time(5, 0)
+
+
 async def _do_scan_and_send(bot, chat_id, lookback):
     scan = await asyncio.to_thread(run_scan, CONFIG, lookback,
                                    secondary_cal_fn=fetch_nasdaq_earnings)
@@ -142,11 +148,6 @@ async def _do_scan_and_send(bot, chat_id, lookback):
     # บันทึกสัญญาณ A/B ลง signals.json (dedup ต่อรอบงบ) — ฐานของสรุปรายสัปดาห์
     record_signals(scan["candidates"], scan["to_date"])
     rows, scored = _record_scan_csv(scan)       # scan_log.csv (schema ไทย + grade) ให้ gem-lab
-    # เกณฑ์ไทยมีชีวิต 14 วัน: คิดคะแนน SET ซ้ำตัวเก่าในกรอบ + หาตัวเพิ่งข้ามเกณฑ์ครั้งแรก (bot/rescore.py)
-    crossed = await asyncio.to_thread(
-        rescore.run, rows, scored, lambda s: get_prices(s, 250),
-        date.fromisoformat(scan["to_date"]), CONFIG.set_qualify_min,
-        CONFIG.rescore_days)
     # ปุ่มรวม "ติดตามถาวรทั้งหมด" ใต้ข้อความสแกนฉบับสุดท้าย (มี candidate ≥2)
     manual = set(load_watchlist())
     all_markup = build_watch_all_markup(
@@ -164,6 +165,23 @@ async def _do_scan_and_send(bot, chat_id, lookback):
                           reply_markup=add_plan_button(build_watch_markup(
                               c["symbol"], in_manual=c["symbol"] in manual,
                               in_auto=True), c["symbol"]))
+    # เกณฑ์ไทยมีชีวิต 14 วัน (bot/rescore.py) — อยู่ *หลัง* ส่งรายงานสแกน: rescore ล้ม/ช้า
+    # ต้องไม่ฉุดรายงานหลัก (เดิมอยู่ก่อนส่ง — state เสีย 1 entry = รายงานทั้งวันหาย)
+    crossed = []
+    if _us_market_maybe_open(datetime.now().time()):
+        # แท่งวันนี้ยังเป็น intraday ไม่ปิด — ตัดสิน qualified ตอนนี้จะกินสิทธิ์แจ้งครั้งแรกถาวร
+        logger.info("rescore: ตลาด US อาจเปิดอยู่ — เลื่อนคิดคะแนนไปรอบสแกนถัดไป")
+    else:
+        try:
+            crossed = await asyncio.to_thread(
+                rescore.run, rows, scored, lambda s: get_prices(s, 250),
+                date.fromisoformat(scan["to_date"]), CONFIG.set_qualify_min,
+                CONFIG.rescore_days, prefetch=prefetch)
+        except Exception:
+            logger.exception("rescore failed")
+            await bot.send_message(
+                chat_id=chat_id,
+                text="⚠️ เกณฑ์ไทยมีชีวิต (rescore) ล้มวันนี้ — จะคิดใหม่รอบสแกนถัดไป · ดู bot.log")
     # ตัวข้ามเกณฑ์ไทยที่ไม่อยู่ในลิสต์ A/B วันนี้ (แจ้งไปแล้วในข้อความสแกน) — แจ้งแยกสั้น ๆ
     cand_syms = [c["symbol"] for c in scan["candidates"]]
     note = rescore.format_crossed(

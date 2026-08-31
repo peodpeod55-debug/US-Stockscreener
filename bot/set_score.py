@@ -163,4 +163,6 @@ def set_score(bars, d0_date):
     pts = _points(ret, vr, s)
     # since_pct = ราคาล่าสุดเทียบปิดก่อน D0 (= since_earn_pct ของไทย: ปิดก่อนวันงบ) — ลง scan_log.csv
     since = round((s["price"] / prev_close - 1) * 100, 2)
-    return {"pts": pts, "stars": stars(pts), "ret_d0_pct": ret, "vol_ratio": vr, "since_pct": since, **s}
+    # asof/days_after = วันแท่งล่าสุด + วันทำการหลัง D0 — ใช้เป็น scan_date/"วันที่ N หลังงบ" (กันวันปฏิทิน/แถวผีวันหยุด)
+    return {"pts": pts, "stars": stars(pts), "ret_d0_pct": ret, "vol_ratio": vr, "since_pct": since,
+            "asof": asc[-1]["date"], "days_after": len(asc) - 1 - start, **s}

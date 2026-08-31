@@ -2,10 +2,12 @@
 แจ้งเฉพาะตัวที่เพิ่งข้ามเกณฑ์ (SET_QUALIFY_MIN) ครั้งแรก + เขียนแถวใหม่ลง scan_log.csv เดิม"""
 import csv
 import inspect
-from datetime import date, timedelta
+import json
+from datetime import date, time, timedelta
 
 from bot.rescore import (due, first_crossings, format_crossed, load_state,
                          rescore_entries, run, track)
+from bot.set_score import set_score
 
 D0 = date(2026, 8, 3)                                   # จันทร์ (ISO week 32)
 D0_ISO = D0.isoformat()
@@ -132,8 +134,14 @@ def test_first_crossing_marks_and_reports_once():
     state, crossed = first_crossings(state, {"AAA": 11}, today, min_pts=10)
     assert crossed == [{"symbol": "AAA", "pts": 11, "days_after": 8, "grade": "D"}]
     assert state["AAA"]["qualified"] == today.isoformat()
+    # วันเดียวกัน (retry หลังส่งล้ม) ต้องได้ตัวเดิมกลับมา — ไม่งั้น ⭐/auto-watch หายถาวร
     state, again = first_crossings(state, {"AAA": 12}, today, min_pts=10)
-    assert again == []
+    assert [c["symbol"] for c in again] == ["AAA"]
+    assert state["AAA"]["qualified"] == today.isoformat()
+    # ข้ามวันแล้วถึงหยุดแจ้ง
+    state, next_day = first_crossings(state, {"AAA": 12},
+                                      today + timedelta(days=1), min_pts=10)
+    assert next_day == []
 
 
 def test_below_min_or_none_does_not_cross():
@@ -176,14 +184,17 @@ def test_run_rescore_writes_csv_row_and_reports_crossing(tmp_path):
     with open(csv_path, encoding="utf-8-sig", newline="") as f:
         rows = list(csv.reader(f))
     head, body = rows[0], rows[1:]
-    added = [r for r in body if r[0] == "2026-08-11" and r[1] == "AAA"]
+    # แถว rescore ลงวันที่ของแท่งล่าสุดจริง (จันทร์ 10 ส.ค.) ไม่ใช่วันที่รัน (11 ส.ค.)
+    added = [r for r in body if r[0] == "2026-08-10" and r[1] == "AAA"]
     assert len(added) == 1
+    assert not [r for r in body if r[0] == "2026-08-11"]
     assert int(added[0][head.index("score")]) >= 10
     assert added[0][head.index("grade")] == "D"
     assert load_state(state_path)["AAA"]["qualified"] == "2026-08-11"
 
 
-def test_run_does_not_report_same_crossing_twice(tmp_path):
+def test_run_same_day_retry_reports_again_next_day_silent(tmp_path):
+    """retry วันเดียวกัน (catch-up หลังส่งล้ม) ต้องได้ crossing เดิมซ้ำ · วันถัดไปถึงเงียบ"""
     csv_path = tmp_path / "scan_log.csv"
     state_path = tmp_path / "rescore_state.json"
     run([_picked_row()], {}, lambda s: None, today=date(2026, 8, 4),
@@ -193,6 +204,10 @@ def test_run_does_not_report_same_crossing_twice(tmp_path):
         crossed = run([], {}, lambda s: bars, today=date(2026, 8, 11),
                       min_pts=10, days=14, csv_path=csv_path,
                       state_path=state_path)
+        assert [c["symbol"] for c in crossed] == ["AAA"]
+    crossed = run([], {}, lambda s: bars, today=date(2026, 8, 12),
+                  min_pts=10, days=14, csv_path=csv_path,
+                  state_path=state_path)
     assert crossed == []
 
 
@@ -238,8 +253,113 @@ def test_scan_flow_wires_rescore():
     src = inspect.getsource(main._do_scan_and_send)
     assert "rescore.run" in src                  # ผ่าน to_thread → ส่งเป็น callable
     assert "format_crossed(" in src
+    # rescore ต้องอยู่หลังส่งรายงานสแกน — ล้ม/ช้าไม่ฉุดรายงานหลัก + มี try/except ของตัวเอง
+    assert src.index("rescore.run") > src.index("enumerate(messages)")
+    assert "except Exception" in src[src.index("rescore.run"):]
+    assert "_us_market_maybe_open" in src        # ตลาดเปิดอยู่ (แท่ง intraday) → เลื่อน ไม่ตัดสิน qualified
+    assert "prefetch" in src                     # อุ่น cache ก่อนลูป serial
 
 
 def test_daily_job_widens_lookback_after_downtime():
     from bot import main
     assert "widen_lookback(" in inspect.getsource(main.daily_job)
+
+
+# ── hardening เวฟ 1 (31 ส.ค. 2026) — retry ไม่กินสัญญาณ · state เสียไม่ล้มสแกน ·
+#    กรอบนับจาก D0 · scan_date/days_after ตามแท่งจริง · guard ตลาดเปิด · prefetch ──
+
+
+def test_load_state_drops_broken_entries(tmp_path):
+    """entry เสีย (ไม่มี d0 / d0 เพี้ยน / ไม่ใช่ dict) ถูกคัดทิ้ง — ไม่พังทั้งสแกน"""
+    p = tmp_path / "rescore_state.json"
+    p.write_text(json.dumps({
+        "AAA": {"earn_date": D0_ISO, "d0": D0_ISO, "grade": "D", "qualified": None},
+        "NOD0": {"earn_date": D0_ISO, "grade": "B", "qualified": None},
+        "BADD0": {"earn_date": D0_ISO, "d0": "ไม่ใช่วันที่", "grade": "B", "qualified": None},
+        "JUNK": "x",
+    }, ensure_ascii=False), encoding="utf-8")
+    assert set(load_state(p)) == {"AAA"}
+
+
+def test_run_survives_broken_state_entry(tmp_path):
+    """state มี entry เสีย 1 ตัว → ตัวดียังถูกคิด (เดิม: KeyError ล้มทั้งรายงานสแกน)"""
+    csv_path = tmp_path / "scan_log.csv"
+    state_path = tmp_path / "rescore_state.json"
+    state_path.write_text(json.dumps({
+        "AAA": {"earn_date": D0_ISO, "d0": D0_ISO, "grade": "D", "qualified": None},
+        "BAD": {"earn_date": D0_ISO, "grade": "B", "qualified": None},
+    }), encoding="utf-8")
+    crossed = run([], {}, lambda s: _bars(STRONG_POST), today=date(2026, 8, 11),
+                  min_pts=10, days=14, csv_path=csv_path, state_path=state_path)
+    assert [c["symbol"] for c in crossed] == ["AAA"]
+
+
+def test_track_and_due_window_from_d0_not_earn_date():
+    """งบประกาศศุกร์เย็น D0 คือวันทำการถัดไป — กรอบ 14 วันต้องนับจาก D0 ไม่ใช่วันงบ"""
+    ent = {"earn_date": "2026-07-20", "d0": "2026-07-28", "grade": "B", "qualified": None}
+    state = track({"AAA": dict(ent)}, [], today=date(2026, 8, 8), days=14)
+    assert "AAA" in state                        # ตัดด้วย earn_date จะพรุนทิ้งผิดตัว
+    assert due(state, today=date(2026, 8, 8), days=14) == ["AAA"]
+
+
+def test_set_score_reports_asof_and_trading_days_after():
+    """set_score บอกวันแท่งล่าสุด (asof) + วันทำการหลัง D0 — ฐานของ scan_date/days_after"""
+    ss = set_score(_bars(STRONG_POST), D0_ISO)
+    assert ss["asof"] == "2026-08-10"
+    assert ss["days_after"] == 5
+
+
+def test_run_crossing_days_after_counts_trading_bars(tmp_path):
+    """days_after ในข้อความ ⭐ = วันทำการหลัง D0 (5) ไม่ใช่วันปฏิทิน (8)"""
+    csv_path = tmp_path / "scan_log.csv"
+    state_path = tmp_path / "rescore_state.json"
+    run([_picked_row()], {}, lambda s: None, today=date(2026, 8, 4),
+        min_pts=10, days=14, csv_path=csv_path, state_path=state_path)
+    crossed = run([], {}, lambda s: _bars(STRONG_POST), today=date(2026, 8, 11),
+                  min_pts=10, days=14, csv_path=csv_path, state_path=state_path)
+    assert crossed[0]["days_after"] == 5
+
+
+def test_rescore_rows_on_holiday_reuse_bar_date_no_ghost_rows(tmp_path):
+    """รันวันอาทิตย์ (คลาสแถวผี HK 30 ส.ค.): แถวลงวันแท่งจริง → ทับแถวเดิม ไม่เกิดแถวใหม่"""
+    csv_path = tmp_path / "scan_log.csv"
+    state_path = tmp_path / "rescore_state.json"
+    run([_picked_row()], {}, lambda s: None, today=date(2026, 8, 4),
+        min_pts=10, days=14, csv_path=csv_path, state_path=state_path)
+    bars = _bars(STRONG_POST + [113.0, 115.0, 117.0, 119.0])    # ถึงศุกร์ 14 ส.ค.
+    run([], {}, lambda s: bars, today=date(2026, 8, 14),
+        min_pts=10, days=14, csv_path=csv_path, state_path=state_path)
+    with open(csv_path, encoding="utf-8-sig", newline="") as f:
+        before = list(csv.reader(f))
+    run([], {}, lambda s: bars, today=date(2026, 8, 16),        # อาทิตย์ — แท่งยังเป็นของศุกร์
+        min_pts=10, days=14, csv_path=csv_path, state_path=state_path)
+    with open(csv_path, encoding="utf-8-sig", newline="") as f:
+        after = list(csv.reader(f))
+    assert after == before
+    assert not [r for r in after if r[0] == "2026-08-16"]
+
+
+def test_run_prefetches_due_symbols(tmp_path):
+    """อุ่น cache ก่อนลูป serial — run ส่งรายชื่อ due ให้ prefetch"""
+    csv_path = tmp_path / "scan_log.csv"
+    state_path = tmp_path / "rescore_state.json"
+    calls = []
+    run([_picked_row()], {}, lambda s: None, today=date(2026, 8, 4), min_pts=10,
+        days=14, csv_path=csv_path, state_path=state_path,
+        prefetch=lambda syms: calls.append(list(syms)))
+    assert calls == []                           # วันแรกไม่มีตัวเก่าให้คิดซ้ำ
+    run([], {}, lambda s: _bars(STRONG_POST), today=date(2026, 8, 11), min_pts=10,
+        days=14, csv_path=csv_path, state_path=state_path,
+        prefetch=lambda syms: calls.append(list(syms)))
+    assert calls == [["AAA"]]
+
+
+def test_us_market_maybe_open_window():
+    """20:00–05:00 ไทย แท่ง US วันนี้อาจยังไม่ปิด — rescore ต้องเลื่อน (เหตุผลเดียวกับ CATCHUP_UNTIL)"""
+    from bot.main import _us_market_maybe_open
+    assert _us_market_maybe_open(time(20, 0))
+    assert _us_market_maybe_open(time(23, 30))
+    assert _us_market_maybe_open(time(4, 59))
+    assert not _us_market_maybe_open(time(5, 0))
+    assert not _us_market_maybe_open(time(8, 30))
+    assert not _us_market_maybe_open(time(19, 59))
