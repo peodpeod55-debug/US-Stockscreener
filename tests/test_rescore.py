@@ -354,6 +354,77 @@ def test_run_prefetches_due_symbols(tmp_path):
     assert calls == [["AAA"]]
 
 
+# ── เวฟ 2 (31 ส.ค. 2026) — crossing → signals.json (set_cross) + ข้อความ ⭐ เต็ม ──
+
+
+def test_run_crossed_carries_context_from_rescore(tmp_path):
+    """crossed ต้องพก ราคา/%จากงบ/⛔ pre_low/วันงบ/D0 — ฐานของ record ลง signals.json + ข้อความ ⭐"""
+    csv_path = tmp_path / "scan_log.csv"
+    state_path = tmp_path / "rescore_state.json"
+    run([_picked_row()], {}, lambda s: None, today=date(2026, 8, 4),
+        min_pts=10, days=14, csv_path=csv_path, state_path=state_path)
+    crossed = run([], {}, lambda s: _bars(STRONG_POST), today=date(2026, 8, 11),
+                  min_pts=10, days=14, csv_path=csv_path, state_path=state_path)
+    c, = crossed
+    assert c["price"] == 111.0                   # ปิดล่าสุดจาก set_score
+    assert c["pre_low"] == 98.0                  # ⛔ low 5 วันก่อนงบ
+    assert c["since_pct"] == round((111.0 / 99.0 - 1) * 100, 2)
+    assert c["earn_date"] == D0_ISO and c["d0"] == D0_ISO
+
+
+def test_run_crossed_context_from_todays_scan(tmp_path):
+    """ตัวที่ข้ามตั้งแต่วันสแกนแรก — บริบทมาจาก scored ของสแกนวันนี้ (ไม่ดึงราคาซ้ำ)"""
+    csv_path = tmp_path / "scan_log.csv"
+    state_path = tmp_path / "rescore_state.json"
+    scored = {"HOT": {"pts": 11, "days_after": 1, "price": 105.0,
+                      "since_pct": 6.06, "pre_low": 98.0}}
+    crossed = run([_picked_row(symbol="HOT", pts=11)], scored, lambda s: None,
+                  today=date(2026, 8, 4), min_pts=10, days=14,
+                  csv_path=csv_path, state_path=state_path)
+    c, = crossed
+    assert c["price"] == 105.0 and c["pre_low"] == 98.0
+    assert c["since_pct"] == 6.06 and c["earn_date"] == D0_ISO
+
+
+def test_signal_candidates_maps_crossed_for_record():
+    """crossed → รูป candidate ให้ record_signals: signal_type=set_cross, sl=⛔ pre_low"""
+    from bot.rescore import signal_candidates
+    cands = signal_candidates([{"symbol": "AAA", "pts": 11, "days_after": 5,
+                                "grade": "D", "earn_date": D0_ISO, "d0": D0_ISO,
+                                "price": 111.0, "since_pct": 12.12, "pre_low": 98.0}])
+    c, = cands
+    assert c["signal_type"] == "set_cross"
+    assert c["symbol"] == "AAA" and c["earnings_date"] == D0_ISO
+    assert c["levels"] == {"price": 111.0, "sl": 98.0}
+    assert c["score"] == 11 and c["grade"] == "D"
+
+
+def test_format_crossed_rich_context_and_auto_days():
+    """ข้อความ ⭐ บอก ราคา + %จากงบ + ⛔ + จำนวนวัน auto-watch จาก AUTO_WATCH_DAYS (ไม่ hard-code 30)"""
+    item = {"symbol": "AAA", "pts": 11, "days_after": 5, "grade": "D",
+            "price": 111.0, "since_pct": 12.12, "pre_low": 98.0}
+    text = format_crossed([item], min_pts=10, auto_days=45)
+    assert "111" in text and "+12.1" in text
+    assert "⛔" in text and "98" in text
+    assert "45 วัน" in text and "30 วัน" not in text
+    # ไฟล์ state เก่า/entry ไม่มีบริบท → บรรทัดเดิม ไม่ล้ม
+    assert "BBB" in format_crossed([{"symbol": "BBB", "pts": 10, "days_after": 3,
+                                     "grade": "?"}], min_pts=10)
+
+
+def test_scan_flow_records_set_cross_and_charts():
+    """สแกนต้องบันทึก crossing ลง signals.json (feedback loop ของเกณฑ์ SET≥10) + ส่งกราฟตัวข้าม"""
+    import inspect as _i
+    from bot import main
+    src = _i.getsource(main._do_scan_and_send)
+    assert "signal_candidates(" in src
+    assert src.index("signal_candidates") > src.index("rescore.run")
+    # กราฟ+ปุ่มของตัวข้ามเกณฑ์ ตามหลังข้อความ ⭐ (bars อยู่ใน cache แล้ว)
+    assert src.rindex("_send_chart") > src.index("format_crossed")
+    # ตัวหลุดเพดาน auto-watch ต้องถูกแจ้ง ไม่หายเงียบ (§2.3)
+    assert "evicted" in src
+
+
 def test_us_market_maybe_open_window():
     """20:00–05:00 ไทย แท่ง US วันนี้อาจยังไม่ปิด — rescore ต้องเลื่อน (เหตุผลเดียวกับ CATCHUP_UNTIL)"""
     from bot.main import _us_market_maybe_open

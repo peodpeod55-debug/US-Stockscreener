@@ -1,7 +1,8 @@
-"""สถิติผลงานสะสมของสัญญาณ A/B ทั้งหมดใน signals.json
+"""สถิติผลงานสะสมของสัญญาณ A/B + ⭐ set_cross ทั้งหมดใน signals.json
 
-ตอบว่าเกรดจากระบบ 5-factor มี edge จริงไหม: drift เฉลี่ย +5/+20/+60 วันทำการ,
-win rate ต่อ horizon, อัตราเคยหลุด SL — แยกตามเกรดและรวม
+ตอบว่าเกรดจากระบบ 5-factor (และเกณฑ์ SET≥10/14 วัน — signal_type "set_cross"
+เพิ่ม 31 ส.ค. 2026) มี edge จริงไหม: drift เฉลี่ย +5/+20/+60 วันทำการ,
+win rate ต่อ horizon, อัตราเคยหลุด SL — แยกตามเกรด, กลุ่ม set_cross และรวม
 
 นิยามแท่ง "หลังแจ้ง" = date > flag_date (convention เดียวกับ sl_hit ใน weekly
 เพื่อให้สองรายงานตัวเลขตรงกัน) · สัญญาณที่หน้าต่างราคา 250 วันย้อนไม่ถึงวันแจ้ง
@@ -10,6 +11,7 @@ win rate ต่อ horizon, อัตราเคยหลุด SL — แย�
 import logging
 
 HORIZONS = (5, 20, 60)          # วันทำการหลังแจ้ง
+SET_CROSS = "set_cross"         # คีย์กลุ่มของสัญญาณข้ามเกณฑ์ไทย (⭐) ใน summarize
 
 logger = logging.getLogger("bot.stats")
 
@@ -31,7 +33,8 @@ def evaluate_stat(sig, prices):
     sl_hit = None
     if sig.get("sl") is not None:
         sl_hit = any(b["low"] < sig["sl"] for b in post)
-    return {"grade": sig.get("grade"), "drifts": drifts, "sl_hit": sl_hit}
+    return {"grade": sig.get("grade"), "signal_type": sig.get("signal_type") or "composite",
+            "drifts": drifts, "sl_hit": sl_hit}
 
 
 def build_stats(signals, get_prices):
@@ -55,11 +58,17 @@ def _empty_group():
                          for h in HORIZONS}}
 
 
+def _group_keys(ev):
+    """composite → เกรด · set_cross → "set_cross" (เกรดเดิมเป็นข้อมูลประกอบ ไม่ปนกลุ่ม A/B) · ทุกตัว → "all" """
+    key = SET_CROSS if ev.get("signal_type") == SET_CROSS else (ev.get("grade") or "?")
+    return (key, "all")
+
+
 def summarize(evaluated):
-    """รวมเป็นกลุ่มต่อเกรด + กลุ่ม "all" — {grade: {n, sl_n, sl_hits, horizons}}"""
+    """รวมเป็นกลุ่มต่อเกรด \\ "set_cross" + กลุ่ม "all" — {key: {n, sl_n, sl_hits, horizons}}"""
     groups = {}
     for ev in evaluated:
-        for key in (ev.get("grade") or "?", "all"):
+        for key in _group_keys(ev):
             g = groups.setdefault(key, _empty_group())
             g["n"] += 1
             if ev["sl_hit"] is not None:

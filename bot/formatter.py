@@ -382,10 +382,17 @@ def format_weekly(items):
     items = sorted(items, key=lambda it: it["pct"], reverse=True)
     lines = ["📊 สรุปผลหุ้นที่บอทแจ้ง (30 วันล่าสุด)"]
     for it in items:
-        icon = GRADE_ICON.get(it.get("grade"), "⚪")
-        score = f" · {it['score']:.0f}" if it.get("score") is not None else ""
+        # ⭐ set_cross = สัญญาณข้ามเกณฑ์ไทย (คนละ cohort กับเกรด — เกรดเดิมเป็นข้อมูลประกอบ)
+        if it.get("signal_type") == "set_cross":
+            icon = "⭐"
+            score = f" {it['score']:.0f}/15" if it.get("score") is not None else ""
+            tag = f"[SET≥10{score} · เกรดเดิม {it.get('grade') or '?'}]"
+        else:
+            icon = GRADE_ICON.get(it.get("grade"), "⚪")
+            score = f" · {it['score']:.0f}" if it.get("score") is not None else ""
+            tag = f"[เกรด {it['grade']}{score}]"
         lines.append("")
-        lines.append(f"{icon} {it['symbol']} [เกรด {it['grade']}{score}] "
+        lines.append(f"{icon} {it['symbol']} {tag} "
                      f"แจ้ง {it['flag_date']} @ {it['flag_price']:,.2f}")
         line = (f"   ตอนนี้ {it['price_now']:,.2f} → {_signed(it['pct'])} "
                 f"({it['days']} วัน)")
@@ -542,11 +549,13 @@ def format_stats(groups, total):
         return None
     lines = ["📊 สถิติสะสมสัญญาณที่บอทแจ้ง",
              f"ทั้งหมด {total} สัญญาณ · ประเมินได้ {all_g['n']}"]
-    for key, label in (("A", "เกรด A"), ("B", "เกรด B"), ("all", "รวมทุกเกรด")):
+    for key, icon, label in (("A", "🔵", "เกรด A"), ("B", "🟡", "เกรด B"),
+                             ("set_cross", "⭐", "ข้ามเกณฑ์ไทย SET≥10"),
+                             ("all", "⚪", "รวมทุกเกรด")):
         g = groups.get(key)
         if not g or not g["n"]:
             continue
-        lines += ["", f"{GRADE_ICON.get(key, '⚪')} {label} — {g['n']} ตัว"]
+        lines += ["", f"{icon} {label} — {g['n']} ตัว"]
         for h in HORIZONS:
             hh = g["horizons"][h]
             if hh["n"]:

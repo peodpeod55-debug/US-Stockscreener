@@ -101,6 +101,21 @@ def test_summarize_sl_none_not_counted():
     assert groups["A"]["sl_n"] == 0
 
 
+def test_evaluate_stat_carries_signal_type():
+    """สัญญาณ set_cross ต้องไม่หลอมรวมกับเกรด — evaluate ติด signal_type ไปด้วย (เก่าไม่มีคีย์ = composite)"""
+    ev = evaluate_stat(_sig(signal_type="set_cross"), _prices([102.0] * 5))
+    assert ev["signal_type"] == "set_cross"
+    assert evaluate_stat(_sig(), _prices([102.0] * 5))["signal_type"] == "composite"
+
+
+def test_summarize_set_cross_group_separate_from_grade():
+    groups = summarize([_ev("B", 3.0),
+                        dict(_ev("B", 8.0), signal_type="set_cross")])
+    assert groups["B"]["n"] == 1                 # เกรดเดิมของตัวข้ามไม่ปนกลุ่ม B
+    assert groups["set_cross"]["n"] == 1
+    assert groups["all"]["n"] == 2
+
+
 # ── build_stats ──────────────────────────────────────────────────
 
 def test_build_stats_skips_fetch_errors():
@@ -130,6 +145,21 @@ def test_format_stats_message():
     assert "เกรด B — 1 ตัว" in msg
     assert "รวมทุกเกรด — 3 ตัว" in msg
     assert "+20 วัน: ยังไม่มีตัวที่ถือถึง" in msg
+
+
+def test_format_stats_set_cross_row():
+    groups = summarize([_ev("A", 10.0), dict(_ev("B", 8.0), signal_type="set_cross")])
+    msg = format_stats(groups, total=2)
+    assert "SET≥10" in msg and "⭐" in msg
+
+
+def test_format_weekly_set_cross_item():
+    from bot.formatter import format_weekly
+    it = {"symbol": "AAA", "grade": "D", "score": 11, "signal_type": "set_cross",
+          "flag_date": "2026-08-11", "flag_price": 111.0, "price_now": 120.0,
+          "pct": 8.1, "days": 5, "sl_hit": None, "sl": 98.0}
+    msg = format_weekly([it])
+    assert "⭐" in msg and "SET≥10" in msg
 
 
 def test_format_stats_empty_returns_none():

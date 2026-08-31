@@ -72,8 +72,10 @@ from bot.weekly import SIGNAL_LOOKBACK_DAYS, build_weekly_items
 from bot.earnings_store import default_sources, known_earnings, refresh
 from bot.prices import get_prices, prefetch
 from bot.yahoo_prices import fetch_yahoo_prices
+from bot.set_score import SET_SCORE_MAX
 from bot.watchlist import (
     AUTO_WATCH_DAYS,
+    AUTO_WATCH_MAX,
     WATCHLIST_MAX,
     active_auto,
     add_symbols,
@@ -177,27 +179,45 @@ async def _do_scan_and_send(bot, chat_id, lookback):
                 rescore.run, rows, scored, lambda s: get_prices(s, 250),
                 date.fromisoformat(scan["to_date"]), CONFIG.set_qualify_min,
                 CONFIG.rescore_days, prefetch=prefetch)
+            # crossing → signals.json (signal_type=set_cross) — feedback loop ของเกณฑ์ SET≥10:
+            # เข้า weekly drift + /stats แยก cohort · dedup ต่อ (symbol, earn, type) retry ไม่เบิ้ล
+            record_signals(rescore.signal_candidates(crossed), scan["to_date"])
         except Exception:
             logger.exception("rescore failed")
             await bot.send_message(
                 chat_id=chat_id,
                 text="⚠️ เกณฑ์ไทยมีชีวิต (rescore) ล้มวันนี้ — จะคิดใหม่รอบสแกนถัดไป · ดู bot.log")
-    # ตัวข้ามเกณฑ์ไทยที่ไม่อยู่ในลิสต์ A/B วันนี้ (แจ้งไปแล้วในข้อความสแกน) — แจ้งแยกสั้น ๆ
+    # ตัวข้ามเกณฑ์ไทยที่ไม่อยู่ในลิสต์ A/B วันนี้ (แจ้งไปแล้วในข้อความสแกน) — แจ้งแยก + กราฟ
     cand_syms = [c["symbol"] for c in scan["candidates"]]
-    note = rescore.format_crossed(
-        [c for c in crossed if c["symbol"] not in set(cand_syms)],
-        CONFIG.set_qualify_min)
+    new_crossed = [c for c in crossed if c["symbol"] not in set(cand_syms)]
+    note = rescore.format_crossed(new_crossed, CONFIG.set_qualify_min,
+                                  auto_days=AUTO_WATCH_DAYS)
     if note:
         await bot.send_message(chat_id=chat_id, text=note)
+    # กราฟ+ปุ่มเหมือน candidate — bars อยู่ใน fetch_cache จาก rescore แล้ว ไม่ยิงเน็ตเพิ่ม
+    for c in new_crossed[:CHART_MAX]:
+        await _send_chart(bot, chat_id, c["symbol"],
+                          {"sl": c.get("pre_low"), "reaction_date": c.get("d0")},
+                          caption=f"⭐ {c['symbol']} — SET {c['pts']}/{SET_SCORE_MAX} "
+                                  f"(วันทำการที่ {c['days_after']} หลังงบ)",
+                          reply_markup=add_plan_button(build_watch_markup(
+                              c["symbol"], in_manual=c["symbol"] in manual,
+                              in_auto=True), c["symbol"]))
     # หุ้นเกรด A/B + ตัวข้ามเกณฑ์ไทย เข้า watchlist อัตโนมัติ → ได้เตือนทะลุแนว/วันงบต่อเอง
-    added = auto_add(cand_syms + [c["symbol"] for c in crossed
-                                  if c["symbol"] not in cand_syms])
+    added, evicted = auto_add(cand_syms + [c["symbol"] for c in crossed
+                                           if c["symbol"] not in cand_syms])
     if added:
         await bot.send_message(
             chat_id=chat_id,
             text=f"➕ ติดตามอัตโนมัติ {AUTO_WATCH_DAYS} วัน: {', '.join(added)}\n"
                  "จะเตือนเมื่อทะลุแนว High 5 วัน/3 เดือนก่อนงบ · "
                  "เอาออก: เลิกติดตาม <ticker>")
+    if evicted:
+        # เพดานเต็มตัวเก่าสุดหลุด — ต้องบอก ไม่งั้นผู้ใช้เชื่อว่ายังเฝ้าอยู่ (ฤดูงบเกิน 20 ได้จริง)
+        await bot.send_message(
+            chat_id=chat_id,
+            text=f"➖ หลุดจากติดตามอัตโนมัติ (เต็มเพดาน {AUTO_WATCH_MAX}): "
+                 f"{', '.join(evicted)}\nยังต้องการเฝ้า: ติดตาม <ticker> (ถาวร)")
 
 
 def _record_scan_csv(scan):

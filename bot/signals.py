@@ -22,12 +22,18 @@ def load_signals(path=SIGNALS_PATH):
 
 
 def record_signals(candidates, flag_date, path=SIGNALS_PATH):
-    """บันทึกหุ้น A/B จากสแกน — คืนเฉพาะสัญญาณใหม่จริง (dedup ครั้งแรกที่แจ้งชนะ)"""
+    """บันทึกหุ้น A/B จากสแกน + ตัวข้ามเกณฑ์ไทย (set_cross) — คืนเฉพาะสัญญาณใหม่จริง
+
+    dedup ต่อ (symbol, earnings_date, signal_type): หุ้น A/B รอบงบเดิมที่ข้าม SET≥10
+    ทีหลังได้ record ที่สอง (คนละ cohort คนละ flag_date — /stats แยกกลุ่มวัดผลเกณฑ์ใหม่ได้)
+    ไฟล์เก่าไม่มีคีย์ signal_type = composite
+    """
     signals = load_signals(path)
-    seen = {(s.get("symbol"), s.get("earnings_date")) for s in signals}
+    _sig_type = lambda s: s.get("signal_type") or "composite"
+    seen = {(s.get("symbol"), s.get("earnings_date"), _sig_type(s)) for s in signals}
     new = []
     for c in candidates:
-        key = (c.get("symbol"), c.get("earnings_date"))
+        key = (c.get("symbol"), c.get("earnings_date"), _sig_type(c))
         lv = c.get("levels") or {}
         if not key[0] or key in seen or lv.get("price") is None:
             continue
@@ -43,6 +49,7 @@ def record_signals(candidates, flag_date, path=SIGNALS_PATH):
             "flag_price": lv["price"],
             "sl": lv.get("sl"),
             "dr_symbols": c.get("dr_symbols") or "",
+            "signal_type": _sig_type(c),
         })
     if new:
         write_json_atomic(path, signals + new)

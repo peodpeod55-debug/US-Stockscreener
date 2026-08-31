@@ -104,10 +104,11 @@ def active_auto(path=AUTO_WATCH_PATH, today=None):
 
 def auto_add(symbols, path=AUTO_WATCH_PATH, manual_path=WATCHLIST_PATH,
              today=None):
-    """เพิ่มหุ้น A/B จากสแกน — คืนเฉพาะตัวใหม่จริง (ไว้แจ้งผู้ใช้)
+    """เพิ่มหุ้น A/B จากสแกน — คืน (ตัวใหม่จริง, ตัวที่หลุดเพราะเต็มเพดาน)
 
     ตัวที่ user ติดตามเองอยู่แล้วข้าม · ตัวที่อยู่ใน auto แล้วต่ออายุ (นับวันใหม่)
-    ล้างตัวหมดอายุทิ้งไปด้วย และถ้าเกินเพดานตัวเก่าสุดหลุด
+    ล้างตัวหมดอายุทิ้งไปด้วย และถ้าเกินเพดานตัวเก่าสุดหลุด — ผู้เรียกต้องแจ้ง
+    ตัวที่หลุดให้ผู้ใช้รู้ (ฤดูงบเกิน 20 ตัวได้จริง — หายเงียบ = ผู้ใช้เชื่อว่ายังเฝ้าอยู่)
     """
     today = today or date.today()
     manual = set(load_watchlist(manual_path))
@@ -119,11 +120,13 @@ def auto_add(symbols, path=AUTO_WATCH_PATH, manual_path=WATCHLIST_PATH,
         if sym not in data:
             added.append(sym)
         data[sym] = today.isoformat()
+    evicted = []
     while len(data) > AUTO_WATCH_MAX:
         oldest = min(data, key=lambda s: data[s])
+        evicted.append(oldest)
         del data[oldest]
     save_auto_watch(data, path)
-    return added
+    return added, evicted
 
 
 def remove_everywhere(symbols, manual_path=WATCHLIST_PATH,

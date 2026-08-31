@@ -58,6 +58,28 @@ def test_record_skips_candidate_without_price(tmp_path):
     assert load_signals(p) == []
 
 
+def test_record_signal_type_defaults_composite(tmp_path):
+    """ไฟล์/candidate เดิมไม่มี signal_type → บันทึกเป็น composite (สอดคล้อง stats ฝั่ง HK)"""
+    p = tmp_path / "signals.json"
+    record_signals([_cand("NVDA", 100.0)], "2026-08-05", path=p)
+    assert load_signals(p)[0]["signal_type"] == "composite"
+
+
+def test_set_cross_records_separately_from_composite_same_round(tmp_path):
+    """หุ้น A/B รอบงบเดิมข้าม SET≥10 ทีหลัง → ได้ record ที่สอง (คนละ cohort คนละ flag_date)
+    แต่ dedup ภายใน set_cross เอง (retry วันเดียวกันไม่เบิ้ล)"""
+    p = tmp_path / "signals.json"
+    record_signals([_cand("NVDA", 100.0)], "2026-08-05", path=p)
+    cross = _cand("NVDA", 111.0, sl=98.0, signal_type="set_cross")
+    new = record_signals([cross], "2026-08-10", path=p)
+    assert [s["signal_type"] for s in new] == ["set_cross"]
+    sigs = load_signals(p)
+    assert len(sigs) == 2
+    assert sigs[1]["flag_date"] == "2026-08-10" and sigs[1]["flag_price"] == 111.0
+    assert record_signals([cross], "2026-08-10", path=p) == []
+    assert len(load_signals(p)) == 2
+
+
 # ── load_signals ─────────────────────────────────────────────────
 
 def test_load_missing_or_corrupt_file(tmp_path):

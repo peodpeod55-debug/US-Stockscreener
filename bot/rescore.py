@@ -129,8 +129,12 @@ def first_crossings(state, pts_map, today, min_pts, days_map=None):
     return out, crossed
 
 
-def format_crossed(items, min_pts):
-    """ข้อความแจ้งตัวข้ามเกณฑ์ครั้งแรก — ว่าง = "" (ไม่ส่ง)"""
+def format_crossed(items, min_pts, auto_days=30):
+    """ข้อความแจ้งตัวข้ามเกณฑ์ครั้งแรก — ว่าง = "" (ไม่ส่ง)
+
+    บรรทัดบริบท (ราคา/%จากงบ/⛔) โผล่เมื่อ crossed พกมา (run เติมให้) —
+    entry จาก state เก่าที่ไม่มีก็ยังแจ้งบรรทัดหลักได้ · auto_days = AUTO_WATCH_DAYS จริงจากผู้เรียก
+    """
     if not items:
         return ""
     lines = [f"⭐ ข้ามเกณฑ์ไทยครั้งแรก (≥{min_pts}/{SET_SCORE_MAX}):"]
@@ -138,8 +142,26 @@ def format_crossed(items, min_pts):
         grade = c.get("grade") or "?"
         lines.append(f"• {c['symbol']} {c['pts']}/{SET_SCORE_MAX} {stars(c['pts'])}"
                      f" — วันทำการที่ {c['days_after']} หลังงบ · เกรดเดิม {grade}")
-    lines.append("เข้า auto-watch 30 วันแล้ว — เตือนทะลุแนว/หลุด ⛔ ต่อให้เอง")
+        if c.get("price") is not None:
+            since = (f" · {c['since_pct']:+.1f}% จากงบ"
+                     if c.get("since_pct") is not None else "")
+            stop = f" · ⛔ {c['pre_low']:,.2f}" if c.get("pre_low") is not None else ""
+            lines.append(f"   ราคา {c['price']:,.2f}{since}{stop}")
+    lines.append(f"เข้า auto-watch {auto_days} วันแล้ว — เตือนทะลุแนว/หลุด ⛔ ต่อให้เอง")
     return "\n".join(lines)
+
+
+def signal_candidates(crossed):
+    """crossed → รูป candidate ให้ record_signals — signal_type="set_cross"
+
+    feedback loop ของเกณฑ์ SET≥10: flag_date=วันข้าม flag_price=ปิดวันข้าม sl=⛔ pre_low
+    → เข้า weekly drift + /stats แยก cohort วัดว่าเกณฑ์นี้ work จริงไหม
+    score เก็บ pts (สเกล 0-15 ไม่ใช่ 0-100 — กลุ่ม set_cross แยกอยู่แล้วไม่ปน)
+    """
+    return [{"symbol": c["symbol"], "grade": c.get("grade"), "score": c.get("pts"),
+             "earnings_date": c.get("earn_date"), "signal_type": "set_cross",
+             "levels": {"price": c.get("price"), "sl": c.get("pre_low")}}
+            for c in crossed]
 
 
 def run(rows, scored, get_bars, today, min_pts, days,
@@ -170,4 +192,14 @@ def run(rows, scored, get_bars, today, min_pts, days,
     state, crossed = first_crossings(state, {**todays_pts, **pts_map},
                                      today, min_pts, days_map)
     save_state(state, state_path)
+    # เติมบริบทจาก set_score (สแกนวันนี้ = scored · ตัวคิดซ้ำ = entries) + state —
+    # ฐานของข้อความ ⭐ เต็ม และ record ลง signals.json (signal_candidates)
+    ss_map = {sym: scored.get(sym) for sym in todays_pts}
+    ss_map.update({row["symbol"]: ss for row, ss in entries})
+    for c in crossed:
+        ss = ss_map.get(c["symbol"]) or {}
+        st = state.get(c["symbol"]) or {}
+        c.update(price=ss.get("price"), since_pct=ss.get("since_pct"),
+                 pre_low=ss.get("pre_low"), earn_date=st.get("earn_date"),
+                 d0=st.get("d0"))
     return crossed
