@@ -1,4 +1,4 @@
-"""บันทึกถาวรของสัญญาณ A/B ที่บอทแจ้ง — signals.json (track ใน git ไว้เป็น backup)
+"""บันทึกถาวรของสัญญาณ A/B ที่บอทแจ้ง — signals.json (gitignore ตั้งแต่ 31 ส.ค. 2026 — กัน checkout ทับไฟล์ live, ประวัติเก่าอยู่ใน git history)
 
 แทนการอ่าน reports/scan_*.json (gitignored, อยู่เครื่องเดียว) — หนึ่งสัญญาณ =
 (symbol, earnings_date) บันทึกครั้งแรกที่แจ้ง ใช้ทำสรุปรายสัปดาห์ + สถิติระยะยาว

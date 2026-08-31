@@ -1,7 +1,7 @@
 """เขียนไฟล์ JSON แบบ atomic — เขียนลง .tmp ข้างๆ, fsync, แล้ว os.replace ทับ
 
 ไฟดับ/crash กลางคันไฟล์เดิมยังอยู่ครบ (os.replace atomic ทั้ง Windows/POSIX)
-ใช้กับไฟล์ state ทุกตัว: signals/breakouts (ประวัติถาวร track ใน git),
+ใช้กับไฟล์ state ทุกตัว: signals/breakouts (ประวัติถาวร — gitignore),
 watchlist/auto_watch/job_state — เดิม write_text ทับตรงๆ พังได้ทั้งไฟล์
 .tmp ที่ตกค้างจาก crash ระหว่าง replace ถูก gitignore และโดนเขียนทับรอบถัดไป
 """

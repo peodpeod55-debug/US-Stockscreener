@@ -5,7 +5,7 @@ gem-lab (`lib/scanlog.mjs`) อ่าน CSV ตามชื่อคอลั�
 ไฟล์นี้จึงต้อง "สะสม" หนึ่งแถวต่อ (scan_date, ticker) เหมือนไทย (ไทย append ซ้ำแล้ว dedup ตอนอ่าน — ที่นี่กันตั้งแต่เขียน: รอบหลังทับรอบก่อนของวันเดียวกัน)
 score = คะแนน SET 0-15 (bot.set_score คิดสด ณ วันเขียน) · grade = A–D ของ composite 5-factor (เพิ่มท้ายสุด ไม่กระทบตัวอ่านของไทย)
 เขียนจาก /scanlog และสแกน 08:30 (bot.main — bars จาก fetch_cache ที่ run_scan เพิ่งดึง ไม่ยิงเน็ตซ้ำ) · utf-8-sig + CRLF เปิด Excel ได้ ·
-เขียนไม่ได้ (ไฟล์ถูก Excel ล็อก) → log เตือน ไม่ล้มสแกน (พฤติกรรมเดียวกับไทย) · track ใน git เหมือน signals.json
+เขียนไม่ได้ (ไฟล์ถูก Excel ล็อก) → log เตือน ไม่ล้มสแกน (พฤติกรรมเดียวกับไทย) · gitignore เหมือน signals.json
 """
 import csv
 import logging

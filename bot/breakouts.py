@@ -1,4 +1,4 @@
-"""บันทึกถาวรของเหตุการณ์ทะลุแนว — breakouts.json (track ใน git แบบ signals.json)
+"""บันทึกถาวรของเหตุการณ์ทะลุแนว — breakouts.json (gitignore แบบ signals.json)
 
 ป้อนให้ gem-lab เป็น candidate ยิง Gem (source [us]) — เก็บเฉพาะทะลุแนวขึ้น
 (new_breaks) ไม่เก็บหลุด SL/Low ก่อนงบ เพราะเป็นสัญญาณขาออก ไม่ใช่ candidate
