@@ -34,19 +34,36 @@ def fetch_yahoo_prices(symbol, days=250, get=requests.get, raw=False):
             return None
         r0 = result[0]
         ts = r0.get("timestamp") or []
-        quote = ((r0.get("indicators") or {}).get("quote") or [{}])[0]
+        indicators = r0.get("indicators") or {}
+        quote = (indicators.get("quote") or [{}])[0]
         series = [quote.get(k) or [] for k in
                   ("open", "high", "low", "close", "volume")]
+        adj = (indicators.get("adjclose") or [{}])[0].get("adjclose") or []
+        # ราคา meta ใช้กู้ close ได้เฉพาะแท่งของวันเดียวกับ regularMarketTime
+        # (ระหว่างตลาดเปิดมันคือราคาสด ไม่ใช่ราคาปิด — ห้ามแช่ให้วันอื่น)
+        meta = r0.get("meta") or {}
+        mt = meta.get("regularMarketTime")
+        meta_date = (datetime.fromtimestamp(mt, tz=timezone.utc).date().isoformat()
+                     if isinstance(mt, (int, float)) else None)
+        meta_price = meta.get("regularMarketPrice")
         bars = []
         for i, t in enumerate(ts):
-            vals = [s[i] if i < len(s) else None for s in series]
-            if any(v is None for v in vals):
-                continue  # วันหยุด/แท่งพัง Yahoo ใส่ null มา
-            o, h, lo, c, v = vals
+            o, h, lo, c, v = [s[i] if i < len(s) else None for s in series]
             # timestamp คือเวลาเปิดตลาด ET → วันที่ UTC ตรงกับวันซื้อขายเสมอ
+            bar_date = datetime.fromtimestamp(t, tz=timezone.utc).date().isoformat()
+            if c is None and None not in (o, h, lo, v):
+                # Yahoo บางวันส่งแท่งที่ o/h/l/v ครบแต่ close=null (เจอจริงทั้งตลาด
+                # 2026-08-28) — กู้จาก adjclose ก่อน ไม่มีก็ใช้ราคา meta วันเดียวกัน
+                # ค่าที่กู้ต้องอยู่ในช่วง [low, high] ของแท่งนั้น ไม่งั้นทิ้งตามเดิม
+                cand = adj[i] if i < len(adj) else None
+                if cand is None and bar_date == meta_date:
+                    cand = meta_price
+                if cand is not None and lo <= cand <= h:
+                    c = cand
+            if None in (o, h, lo, c, v):
+                continue  # วันหยุด/แท่งพัง Yahoo ใส่ null มา
             bars.append({
-                "date": datetime.fromtimestamp(t, tz=timezone.utc)
-                .date().isoformat(),
+                "date": bar_date,
                 "open": float(o), "high": float(h), "low": float(lo),
                 "close": float(c), "volume": int(v),
             })

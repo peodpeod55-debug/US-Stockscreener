@@ -54,6 +54,24 @@ def test_compute_levels_missing_date_returns_none():
     assert compute_levels(bars, "1999-01-01", "amc") is None
 
 
+# ── ยาม D0: แท่งวันตอบรับหายจากซีรีส์ ห้ามเลื่อนไปใช้วันถัดไปเงียบ ๆ ──
+# เคสจริง 2026-08-28: Yahoo ส่งแท่งศุกร์ close=null ทั้งตลาด ถ้าแท่งหายถาวร
+# งบ พฤ AMC จะได้ D0 = จันทร์ → reaction/vol/SL ผิดหมดโดยไม่มีใครรู้
+
+def test_compute_levels_weekend_gap_still_ok():
+    # ศุกร์ 2026-08-14 AMC → D0 = จันทร์ 17 ห่าง 3 วันปฏิทิน (ขอบบนที่ต้องผ่าน)
+    lv = compute_levels(make_prices(), "2026-08-14", "amc")
+    assert lv is not None
+    assert lv["reaction_date"] == "2026-08-17"
+
+
+def test_compute_levels_rejects_d0_when_reaction_bar_missing():
+    # งบ พฤ 2026-08-13 AMC แต่แท่งศุกร์ 14 หาย → D0 ที่หาได้คือจันทร์ (ห่าง 4 วัน)
+    # ต้องคืน None (ไปเข้า pending "waiting" ให้มองเห็น) ไม่ใช่คำนวณจากวันผิด
+    bars = [b for b in make_prices() if b["date"] != "2026-08-14"]
+    assert compute_levels(bars, "2026-08-13", "amc") is None
+
+
 def test_new_high_count_uptrend():
     # ซีรีส์ราคาขึ้นตลอด → ทุกวันใน 10 วันล่าสุดเป็น new 3M high
     bars = make_prices()

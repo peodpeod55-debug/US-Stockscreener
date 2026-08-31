@@ -135,6 +135,14 @@ def infer_bmo(daily_prices, earnings_date):
         daily_prices[i]["volume"] / avg >= INFER_VOL_RATIO
 
 
+# D0 ห่างวันงบได้มากสุดกี่วันปฏิทิน — ศุกร์ AMC → จันทร์ = 3 (ขอบบนปกติ)
+# เกินนี้แปลว่าแท่ง D0 จริงหายจากซีรีส์ (เช่น Yahoo ส่ง close=null ทั้งตลาด
+# 2026-08-28) → คืน None ให้เข้า pending "waiting" แทนที่จะคำนวณจากวันผิดเงียบ ๆ
+# ยอมแลก: งบชนวันหยุดยาวพิเศษ (พฤ ก่อน Good Friday / ศ ก่อนจันทร์หยุด) จะติด
+# waiting ไปเลย — ข้อมูลเพี้ยนเงียบอันตรายกว่าการรอที่มองเห็น
+_D0_MAX_GAP_DAYS = 3
+
+
 def compute_levels(daily_prices, earnings_date, timing):
     """คืน dict ระดับราคา หรือ None ถ้าหา reaction day (D0) ไม่ได้
 
@@ -148,6 +156,11 @@ def compute_levels(daily_prices, earnings_date, timing):
     d0 = earn_idx if (timing or "").lower() == "bmo" else earn_idx - 1
     if d0 < 0:
         return None  # งบ AMC เพิ่งออก ยังไม่มีวันตอบรับในข้อมูล
+
+    d0_gap = (date.fromisoformat(daily_prices[d0]["date"])
+              - date.fromisoformat(earnings_date)).days
+    if d0_gap > _D0_MAX_GAP_DAYS:
+        return None  # แท่งวันตอบรับจริงหายจากซีรีส์ — อย่าใช้วันถัดไปแทน
 
     price = daily_prices[0]["close"]
     pre = daily_prices[d0 + 1:]  # ทุกวันก่อน D0
