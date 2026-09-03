@@ -14,7 +14,7 @@ JOB_STATE_PATH = PROJECT_ROOT / "job_state.json"
 PUSH_WEEKDAYS = {1, 2, 3, 4, 5}  # date.weekday(): จ=0 → อังคาร(1)–เสาร์(5)
 _ALL_DAYS = set(range(7))
 
-# job เช้าที่ catch-up ได้ (เรียงตามเวลา) — openbell ไม่อยู่เพราะผูกกับช่วงเปิดตลาด
+# job เช้าที่ catch-up ได้ (เรียงตามเวลา)
 SCHEDULE = [
     ("breakout", time(8, 20), PUSH_WEEKDAYS),
     ("reminder", time(8, 25), _ALL_DAYS),
