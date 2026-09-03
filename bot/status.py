@@ -3,6 +3,7 @@
 รวมทุกแหล่งที่เคยต้องไล่ดูเองเวลาสงสัยว่าบอทโอเคไหม: process (PID/เริ่มเมื่อ),
 โค้ดที่รันอยู่เทียบ HEAD (ต้อง restart ไหม), job เช้าวันนี้ (job_state.json),
 รอตอบรับ (pending.json), watchlist, สัญญาณสะสม, FMP 402/เตือน/error วันนี้ใน bot.log,
+เกณฑ์ไทย 14 วัน (rescore_state.json: ตามอยู่กี่ตัว + ตัวที่ข้ามติดกัน ≥2 วัน)
 และผลสแกนล่าสุด (reports/scan_*.json) — ทุก path ฉีดได้เพื่อเทส
 """
 import json
@@ -12,6 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from bot import rescore
 from bot.config import PROJECT_ROOT
 from bot.jobstate import JOB_STATE_PATH, SCHEDULE, _load as _load_job_state
 from bot.pending import load_pending
@@ -134,9 +136,12 @@ def latest_scan(reports_dir=REPORTS_DIR):
 def build_status(now, started_at=None, started_commit=None, head_commit=None, *,
                  job_state_path=JOB_STATE_PATH, pending_path=None,
                  watchlist_path=WATCHLIST_PATH, auto_watch_path=AUTO_WATCH_PATH,
-                 signals_path=None, log_path=LOG_PATH, reports_dir=REPORTS_DIR):
+                 signals_path=None, log_path=LOG_PATH, reports_dir=REPORTS_DIR,
+                 rescore_state_path=None):
     """รวมสถานะทุกแหล่งเป็น dict เดียวให้ format_status — ไฟล์ไหนหาย/พังก็ได้ค่าว่าง"""
     signals = load_signals(signals_path) if signals_path else load_signals()
+    # None = rescore.STATE_PATH ณ เวลาเรียก (ค่าปริยายของ load_state เอง)
+    rescore_state = rescore.load_state(rescore_state_path)
     return {
         "now": now,
         "pid": os.getpid(),
@@ -150,5 +155,7 @@ def build_status(now, started_at=None, started_commit=None, head_commit=None, *,
         "signals_total": len(signals),
         "last_signal": signals[-1] if signals else None,
         "log": scan_log_today(_read_log_lines(log_path), now.date().isoformat()),
+        "rescore": {"tracked": len(rescore_state),
+                    "stale": rescore.stale_entries(rescore_state)},
         "scan": latest_scan(reports_dir),
     }

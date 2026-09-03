@@ -8,8 +8,13 @@
 ตามเฉพาะตัวที่ผ่านด่านวันแรก (แถวใน scan_log = set_hit หรือเข้าเกณฑ์เดิม) — ตัวที่ไม่มี
 ปฏิกิริยาบวกวันแรกไม่ตามย้อนหลัง ตามปรัชญา Set screnner · ดึงราคาไม่ได้ = ข้าม รอลองพรุ่งนี้
 
-state: rescore_state.json {symbol: {earn_date, d0, grade, qualified}} — gitignored
+state: rescore_state.json {symbol: {earn_date, d0, grade, qualified, skip_streak, skip_reason, skip_date}} — gitignored
 qualified = วันที่ข้ามเกณฑ์ครั้งแรก (กันแจ้งซ้ำข้ามวัน — retry วันเดียวกันแจ้งซ้ำได้) · grade = เกรด composite ของ D0 ติดไปกับแถว CSV
+skip_streak/skip_reason = ข้ามติดกันกี่วันและเพราะอะไร (entry เก่าไม่มีคีย์นี้ = 0/None) — ข้ามติดกันคือ
+"หลุดจากการตาม 14 วัน" เงียบ ๆ เช่น Yahoo เขียนแท่ง D0 ทิ้ง จึงต้องเตือน (stale_notice) และโชว์ที่ /status
+skip_date = วันที่นับสตรีคไปแล้ว — สแกนซ้ำวันเดียวกัน (job รายวัน + /scan) ต้องไม่เพิ่มสตรีค เพราะนับเป็น "วัน"
+stale_notice_due = ธง "ยังไม่ได้แจ้ง ⚠️ รอบนี้" ปักตอนสตรีคขึ้นเป็น 2 พอดี แล้ว pop_stale_notices กินทิ้ง —
+⚠️ เป็น *เหตุการณ์* 1→2 ไม่ใช่สภาพ ถ้ากรองจากสตรีคทุกรอบ สแกนซ้ำวันเดิมจะยิงข้อความเดิมซ้ำ
 """
 import json
 import logging
@@ -23,6 +28,7 @@ from bot.set_score import SET_SCORE_MAX, set_score, stars
 logger = logging.getLogger("bot.rescore")
 
 STATE_PATH = PROJECT_ROOT / "rescore_state.json"
+SKIP_REASON_TH = {"no_bars": "ดึงราคาไม่ได้", "score_none": "คิดคะแนนไม่ได้"}   # no_d0_bar/error:X ประกอบข้อความเอง
 
 
 def _valid_entry(v):
@@ -83,24 +89,90 @@ def due(state, today, days, exclude=()):
 
 
 def rescore_entries(state, symbols, get_bars):
-    """คิดคะแนนสดจาก bars ปัจจุบัน → ([(แถวให้ scan_csv, ผล set_score)], {symbol: pts})
+    """คิดคะแนนสดจาก bars ปัจจุบัน → ([(แถวให้ scan_csv, ผล set_score)], {symbol: pts}, {symbol: เหตุที่ข้าม})
 
-    get_bars(symbol) → bars most-recent-first หรือ None — ตัวที่ไม่มีราคา/คิดไม่ได้ ข้ามเงียบ ๆ
-    (ไม่ลงโทษเป็นคะแนน 0 — พรุ่งนี้ due จะหยิบมาลองใหม่เอง)
+    get_bars(symbol) → bars most-recent-first หรือ None — ตัวที่ไม่มีราคา/คิดไม่ได้ ข้าม *พร้อมบอกเหตุ*
+    (ไม่ลงโทษเป็นคะแนน 0 — พรุ่งนี้ due จะหยิบมาลองใหม่เอง) เพราะข้ามเงียบ ๆ = หลุดจากการตาม 14 วันโดยไม่มีใครรู้
+    เหตุ: no_bars (ดึงราคาไม่ได้) · no_d0_bar (Yahoo เขียนแท่ง D0 ทิ้ง) · score_none (แท่งก่อนงบไม่พอ ฯลฯ) ·
+    error:<ชื่อ exception> — ตัวเดียวพังต้องไม่ล้มทั้งลูป (เดิม: ทุกตัวหายจากการตามพร้อมกัน)
     """
-    entries, pts_map = [], {}
+    entries, pts_map, skipped = [], {}, {}
     for sym in symbols:
-        st = state[sym]
-        bars = get_bars(sym)
-        ss = set_score(bars, st["d0"]) if bars else None
-        if ss is None:
+        try:
+            st = state[sym]
+            bars = get_bars(sym)
+            if not bars:
+                skipped[sym] = "no_bars"
+                continue
+            ss = set_score(bars, st["d0"])
+            if ss is None:
+                # หาแท่ง D0 แบบเดียวกับ set_score — แท่งหายกับคิดไม่ได้คนละเหตุ คนละทางแก้
+                skipped[sym] = ("no_d0_bar"
+                                if not any(b.get("date") == st["d0"] for b in bars)
+                                else "score_none")
+                continue
+            row = {"symbol": sym, "earnings_date": st.get("earn_date"),
+                   "ret_d0_pct": ss.get("ret_d0_pct"), "vol_ratio": ss.get("vol_ratio"),
+                   "set_pts": ss["pts"], "grade": st.get("grade")}
+        except Exception as exc:
+            logger.exception("rescore: %s ล้ม — ข้ามตัวนี้ ตัวที่เหลือไปต่อ", sym)
+            skipped[sym] = f"error:{type(exc).__name__}"
             continue
-        row = {"symbol": sym, "earnings_date": st.get("earn_date"),
-               "ret_d0_pct": ss.get("ret_d0_pct"), "vol_ratio": ss.get("vol_ratio"),
-               "set_pts": ss["pts"], "grade": st.get("grade")}
         entries.append((row, ss))
         pts_map[sym] = ss["pts"]
-    return entries, pts_map
+    return entries, pts_map, skipped
+
+
+def _stale_item(sym, v):
+    """entry ใน state → รูปที่ stale_entries/pop_stale_notices/stale_notice ใช้ร่วมกัน"""
+    return {"symbol": sym, "d0": v.get("d0"),
+            "skip_streak": v.get("skip_streak") or 0,
+            "skip_reason": v.get("skip_reason")}
+
+
+def stale_entries(state, min_streak=2):
+    """ตัวที่ข้ามติดกัน ≥ min_streak วัน — เรียงตามรหัส (entry เก่าไม่มี skip_streak = 0 ไม่ติด)
+
+    ใช้กับ /status ที่ถามว่า "ตอนนี้มีตัวไหนค้าง" — ส่วนการ *แจ้ง* ใช้ pop_stale_notices
+    """
+    return [_stale_item(sym, v) for sym, v in sorted(state.items())
+            if (v.get("skip_streak") or 0) >= min_streak]
+
+
+def pop_stale_notices(path=None):
+    """ตัวที่ run() เพิ่งปักธง ⚠️ ไว้ (สตรีคขึ้นเป็น 2 พอดี) — คืนครั้งเดียวแล้วล้างธงลงไฟล์
+
+    ⚠️ ต้องเป็นเหตุการณ์ ไม่ใช่การกรองสภาพ: _do_scan_and_send รันได้หลายรอบต่อวัน (job + /scan +
+    catch-up) การกรอง skip_streak == 2 ใหม่ทุกรอบจึงยิงข้อความเดิมซ้ำ · entry เก่าไม่มีคีย์นี้ = ไม่ติด
+    ล้มตอนส่งหลังกินธงแล้ว = เสียใบแจ้งนั้นไป (ตัวนั้นยังโชว์ที่ /status)
+    """
+    state = load_state(path)
+    items = [_stale_item(sym, v) for sym, v in sorted(state.items())
+             if v.get("stale_notice_due")]
+    if items:
+        for it in items:
+            state[it["symbol"]]["stale_notice_due"] = False
+        save_state(state, path)
+    return items
+
+
+def _skip_reason_th(reason, d0):
+    """เหตุที่ข้าม → ไทย (no_d0_bar บอกวัน D0 ที่หายไปด้วย — ผู้ใช้เช็ค Yahoo ต่อได้ทันที)"""
+    if reason == "no_d0_bar":
+        return f"ไม่มีแท่ง D0 {d0} ใน Yahoo"
+    if (reason or "").startswith("error:"):
+        return f"error {reason.split(':', 1)[1]}"
+    return SKIP_REASON_TH.get(reason, reason or "ไม่ทราบเหตุ")
+
+
+def stale_notice(stale):
+    """ข้อความเตือนตัวที่ข้ามติดกัน (บรรทัดละตัว) — None = ไม่มีอะไรต้องเตือน (ไม่ส่ง)"""
+    if not stale:
+        return None
+    return "\n".join(
+        f"⚠️ เกณฑ์ไทย 14 วัน: ข้าม {s['symbol']} {s['skip_streak']} วันติด"
+        f" — {_skip_reason_th(s.get('skip_reason'), s.get('d0'))}"
+        for s in stale)
 
 
 def first_crossings(state, pts_map, today, min_pts, days_map=None):
@@ -180,11 +252,34 @@ def run(rows, scored, get_bars, today, min_pts, days,
     symbols = due(state, today, days, exclude=set(todays_pts))
     if prefetch and symbols:
         prefetch(symbols)
-    entries, pts_map = rescore_entries(state, symbols, get_bars)
+    entries, pts_map, skipped = rescore_entries(state, symbols, get_bars)
+    # จำสตรีคการข้าม — ข้ามติดกัน = หลุดจากการตามเงียบ ๆ (ต้องเตือน) · ตัวที่ติดแถวสแกนวันนี้ (todays_pts)
+    # คิดคะแนนสดไปแล้ว = สำเร็จ ต้องล้างสตรีคด้วย ไม่งั้น due() ตัดมันออกแล้วสตรีคค้าง → ⚠️ ซ้ำ/ /status ค้างชื่อ
+    today_iso = today.isoformat()
+    for sym in list(todays_pts) + symbols:  # ทั้งสองชุดมาจาก state (track ลงแถวสแกน · due อ่านจาก state)
+        st, reason = state[sym], skipped.get(sym)
+        if not reason:
+            st.update(skip_streak=0, skip_reason=None, skip_date=None,
+                      stale_notice_due=False)
+        elif st.get("skip_date") == today_iso:
+            st["skip_reason"] = reason      # สแกนซ้ำวันเดิม — อัปเดตเหตุ แต่ไม่เพิ่มสตรีค (สตรีคนับเป็นวัน)
+        else:
+            streak = (st.get("skip_streak") or 0) + 1
+            st.update(skip_streak=streak, skip_reason=reason, skip_date=today_iso)
+            if streak == 2:                 # วันแรกที่ "ข้ามถาวร" — ปักธงให้ pop_stale_notices กินไปแจ้ง
+                st["stale_notice_due"] = True
+    n = 0
     if entries:
         n = scan_csv.record_scan_csv(
             entries, today, path=csv_path or scan_csv.SCAN_CSV_PATH)
-        logger.info("rescore: คิดซ้ำ %d ตัว → scan_log.csv %d แถว", len(symbols), n)
+    # สรุป *ทุกรอบ* แม้ไม่มีตัวไหนคิดสำเร็จ — เดิม log อยู่ใน `if entries:` จึงเงียบสนิทตอนที่ควรดังที่สุด
+    if not symbols:
+        logger.info("rescore: ไม่มีตัว due วันนี้")
+    else:
+        note = (" (ข้าม %d: %s)" % (len(skipped), ", ".join(
+            f"{s}={r}" for s, r in sorted(skipped.items()))) if skipped else "")
+        logger.info("rescore: คิดซ้ำ %d/%d ตัว → scan_log.csv %d แถว%s",
+                    len(entries), len(symbols), n, note)
     # days_after = วันทำการหลัง D0 จาก set_score (แถวสแกนวันนี้ + ตัวคิดซ้ำ) — ไม่มีค่อยถอยเป็นวันปฏิทิน
     days_map = {r["symbol"]: (scored.get(r["symbol"]) or {}).get("days_after")
                 for r in picked}

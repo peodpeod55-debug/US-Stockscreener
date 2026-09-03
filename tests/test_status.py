@@ -256,6 +256,7 @@ def test_build_status_assembles_all_sources(tmp_path):
     assert st["log"]["fmp_402"] == ["HD", "BRK.B"]
     assert st["log"]["errors"] == 2
     assert st["scan"]["pending"] == 2
+    assert st["rescore"] == {"tracked": 0, "stale": []}     # rescore_state.json ว่าง (conftest redirect)
 
 
 def test_build_status_survives_missing_files(tmp_path):
@@ -310,6 +311,7 @@ def _status(**over):
         "log": {"fmp_402": ["HD", "BRK.B"], "warnings": 1, "errors": 0, "last_error": None},
         "scan": {"at": datetime(2026, 8, 27, 8, 30, 21), "candidates": [],
                  "skipped": {"C": 2, "D": 1}, "pending": 18, "api_calls": (22, 200)},
+        "rescore": {"tracked": 9, "stale": []},
     }
     base.update(over)
     return base
@@ -384,6 +386,37 @@ def test_format_status_scan_candidates_and_no_scan():
     scan = _status()["scan"] | {"candidates": [("EL", "B"), ("TGT", "B")]}
     assert "A/B 2 (EL:B TGT:B)" in format_status(_status(scan=scan))
     assert "ยังไม่เคยสแกน" in format_status(_status(scan=None))
+
+
+def test_format_status_thai_rule_line_without_stale():
+    """เกณฑ์ไทย 14 วัน: บอกจำนวนที่ตามอยู่ · ไม่มีตัวข้ามค้าง = ไม่มีท่อนหลัง"""
+    msg = format_status(_status())
+    assert "เกณฑ์ไทย: ตาม 9 ตัว" in msg
+    assert "ข้ามติดกัน" not in msg
+
+
+def test_format_status_thai_rule_line_lists_stale_symbols():
+    """ตัวที่ข้ามติดกัน ≥2 วัน ต้องโผล่ที่ /status (⚠️ แจ้งครั้งเดียวตอนสตรีค 2 แล้วเงียบ)"""
+    stale = [{"symbol": "WDAY", "d0": "2026-08-28", "skip_streak": 3,
+              "skip_reason": "no_d0_bar"}]
+    msg = format_status(_status(rescore={"tracked": 9, "stale": stale}))
+    assert "เกณฑ์ไทย: ตาม 9 ตัว · ข้ามติดกัน ≥2 วัน: WDAY (no_d0_bar ×3)" in msg
+
+
+def test_build_status_reads_stale_symbols_from_rescore_state(tmp_path):
+    """build_status อ่าน rescore_state.json ผ่าน path ที่ฉีดได้ (เหมือนทุกแหล่งอื่นในฟังก์ชันนี้)"""
+    path = tmp_path / "rescore_state.json"
+    path.write_text(json.dumps({
+        "WDAY": {"earn_date": "2026-08-27", "d0": "2026-08-28", "grade": "B",
+                 "qualified": None, "skip_streak": 3, "skip_reason": "no_d0_bar",
+                 "skip_date": "2026-08-27"},
+        "EL": {"earn_date": "2026-08-21", "d0": "2026-08-22", "grade": "B",
+               "qualified": None},
+    }), encoding="utf-8")
+    st = build_status(_at(THU, 14, 5), rescore_state_path=path, **_state_files(tmp_path))
+    assert st["rescore"]["tracked"] == 2
+    assert st["rescore"]["stale"] == [{"symbol": "WDAY", "d0": "2026-08-28",
+                                       "skip_streak": 3, "skip_reason": "no_d0_bar"}]
 
 
 def test_format_status_uptime_in_days_and_fits_message_limit():

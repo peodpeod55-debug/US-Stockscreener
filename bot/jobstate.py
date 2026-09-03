@@ -27,6 +27,11 @@ SCHEDULE = [
 # state ถาวร (record_breakouts / auto_remove) — เปิดเครื่องดึกให้รอรันรุ่งเช้าตามปกติแทน
 CATCHUP_UNTIL = time(20, 0)
 
+# คีย์ใน job_state.json (ไฟล์เดียวกับ claim) สำหรับวันที่แท่งล่าสุดที่ breakout_job
+# ประมวลผลไปแล้ว — ไม่ใช่ชื่อ job จึงไม่ชนกับ claim/release/already_ran ที่ใช้ชื่อ job ตรงๆ
+# due_catchup/job_states (bot/status.py) วนตาม SCHEDULE ไม่ใช่คีย์ทั้งหมดของไฟล์ ไม่มีวันเห็นคีย์นี้
+BREAKOUT_BAR_KEY = "breakout_bar"
+
 
 def _load(path):
     try:
@@ -77,6 +82,27 @@ def last_run(job, path=None):
         return date.fromisoformat(raw) if raw else None
     except ValueError:
         return None
+
+
+def last_breakout_bar(path=None):
+    """วันที่ (ISO) ของแท่งล่าสุดที่ breakout_job แจ้งเตือนจบไปแล้ว — None = ยังไม่เคย/ไฟล์เสีย
+
+    เก็บคีย์ BREAKOUT_BAR_KEY ปนในไฟล์เดียวกับ claim ของ job (ดูคอมเมนต์บนค่าคงที่)
+    path อ่านจากโมดูล ณ เวลาเรียก (แบบเดียวกับ last_run) — conftest redirect คุมถึง
+    """
+    return _load(JOB_STATE_PATH if path is None else path).get(BREAKOUT_BAR_KEY)
+
+
+def set_breakout_bar(bar_date, path=None):
+    """บันทึกวันที่แท่งล่าสุดที่ breakout_job เพิ่งแจ้งเตือนสำเร็จ — เรียกท้าย work() เท่านั้น
+
+    (ต้องเกิดหลังส่งข้อความ/บันทึก breakouts.json ผ่านหมดแล้ว ไม่งั้น retry รอบถัดไปจะเข้าใจผิด
+    ว่าแจ้งไปแล้วทั้งที่ยังไม่สำเร็จ)
+    """
+    resolved = JOB_STATE_PATH if path is None else path
+    data = _load(resolved)
+    data[BREAKOUT_BAR_KEY] = bar_date
+    write_json_atomic(resolved, data)
 
 
 def widen_lookback(base, last, today, cap=14):

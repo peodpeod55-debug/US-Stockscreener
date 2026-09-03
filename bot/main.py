@@ -55,7 +55,8 @@ from bot.formatter import (
 from bot.hot import classify_watch
 from bot.levels import below_low_5d
 from bot.jobstate import (PUSH_WEEKDAYS, already_ran, claim, due_catchup,
-                          last_run, release, widen_lookback)
+                          last_breakout_bar, last_run, release,
+                          set_breakout_bar, widen_lookback)
 from bot.openbell import build_open_report, fetch_quote, fetch_yahoo_quote, in_open_window
 from bot.lookup import LOOKUP_MAX, SET_RULE, lookup_symbol, parse_tickers
 from bot.nasdaq_cal import fetch_nasdaq_earnings
@@ -182,6 +183,11 @@ async def _do_scan_and_send(bot, chat_id, lookback):
             # crossing → signals.json (signal_type=set_cross) — feedback loop ของเกณฑ์ SET≥10:
             # เข้า weekly drift + /stats แยก cohort · dedup ต่อ (symbol, earn, type) retry ไม่เบิ้ล
             record_signals(rescore.signal_candidates(crossed), scan["to_date"])
+            # ตัวที่เพิ่งข้ามครบ 2 วันติด = วันแรกที่ "ข้ามถาวร" — rescore.run ปักธงไว้ ที่นี่กินธงทิ้ง
+            # จึงได้ใบแจ้งใบเดียวจริงแม้สแกนซ้ำวันเดิม (job + /scan + catch-up) · ≥3 ไปโผล่ที่ /status
+            notice = rescore.stale_notice(rescore.pop_stale_notices())
+            if notice:
+                await bot.send_message(chat_id=chat_id, text=notice)
         except Exception:
             logger.exception("rescore failed")
             await bot.send_message(
@@ -810,6 +816,7 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
         universe = load_universe()
         auto = active_auto()
         alerts, sl_alerts, low_alerts, pull_alerts, dead = [], [], [], [], []
+        bar_dates = []           # prices[0]["date"] ของทุกตัวที่ดึงราคาได้ — เทียบหาแท่งซ้ำ
         await asyncio.to_thread(prefetch, symbols, 250, client)  # ดึงขนานก่อน
         for sym in symbols:
             try:
@@ -817,6 +824,8 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 logger.exception("breakout check %s failed", sym)
                 continue
+            if snap:
+                bar_dates.append(snap["last_date"])
             if snap and snap.get("new_breaks"):
                 alerts.append(snap)
             if snap and snap.get("sl_break"):
@@ -829,6 +838,13 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
             # (state ไม่ใช่ edge — ตัวที่หลุดค้างมาหลายวันก็โดนเก็บ) manual ไม่แตะ
             if snap and sym in auto and below_low_5d(snap.get("levels")):
                 dead.append(sym)
+        # แท่งล่าสุด (ทุกตัวที่ดึงราคาได้) เหมือนรอบก่อนเป๊ะ = วันหยุด US/Yahoo ยังไม่มีแท่งใหม่
+        # (เช่น อังคารหลัง Labor Day ยังเห็นแท่งศุกร์ตัวเดิมที่รอบเสาร์ประมวลผลไปแล้ว) —
+        # ข้ามทั้งรอบกันแจ้งซ้ำ (ดึงราคาไม่ได้เลยสักตัว = bar_dates ว่าง ปล่อยผ่านตามเดิม ไม่แตะ last_bar)
+        bar_date = max(bar_dates) if bar_dates else None
+        if bar_date is not None and bar_date == last_breakout_bar():
+            logger.info("breakout: แท่งล่าสุด %s เหมือนรอบก่อน (วันหยุด/ยังไม่มีแท่งใหม่) — ข้ามแจ้งซ้ำ", bar_date)
+            return
         removed = auto_remove(dead) if dead else []
         # เหตุการณ์ทะลุแนวลง breakouts.json — gem-lab อ่านไปเป็น candidate ยิง Gem
         record_breakouts(alerts)
@@ -849,6 +865,11 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
                               snap.get("levels"),
                               caption=f"{tag} {snap['symbol']} — "
                                       f"ปิด {snap['price']:,.2f}")
+        # บันทึกหลังงานแจ้งเตือนสำเร็จทั้งหมดเท่านั้น — ส่งข้อความ/ส่งกราฟล้มกลางคัน exception
+        # จะโยนออกจาก work() ก่อนถึงบรรทัดนี้ claim ถูกคืน (_run_claimed) แล้ว catch-up รอบถัดไป
+        # retry ส่งซ้ำได้ — ห้ามบันทึก last_bar ไปก่อนแล้วเงียบทั้งชุดถ้าส่งไม่สำเร็จจริง
+        if bar_date is not None:
+            set_breakout_bar(bar_date)
 
     await _run_claimed(context, "breakout", work)
 

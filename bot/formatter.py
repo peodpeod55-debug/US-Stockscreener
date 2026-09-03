@@ -752,6 +752,12 @@ def format_status(st):
     lines.append(f"📊 สัญญาณสะสม {st['signals_total']}"
                  + (f" · ล่าสุด {sig['symbol']} {sig['grade']} ({sig['flag_date']})"
                     if sig else ""))
+    # เกณฑ์ไทย 14 วัน: ตัวที่ข้ามติดกันหลุดจากการตามเงียบ ๆ — ⚠️ แจ้งครั้งเดียวตอนสตรีค 2 ที่เหลือดูที่นี่
+    resc = st.get("rescore") or {}
+    stale = ", ".join(f"{s['symbol']} ({s['skip_reason']} ×{s['skip_streak']})"
+                      for s in resc.get("stale") or [])
+    lines.append(f"🇹🇭 เกณฑ์ไทย: ตาม {resc.get('tracked', 0)} ตัว"
+                 + (f" · ข้ามติดกัน ≥2 วัน: {stale}" if stale else ""))
 
     lines.append("")
     log = st["log"]
