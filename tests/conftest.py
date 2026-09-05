@@ -40,11 +40,13 @@ def _isolate_settings(tmp_path, monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _isolate_rescore(tmp_path, monkeypatch):
-    """rescore_state.json / scan_log.csv / job_state.json (ผ่าน last_run) เป็น state จริงของเครื่อง —
-    rescore.run และ last_run อ่าน path จาก attribute ของโมดูล ณ เวลาเรียก redirect ตรงนี้จึงคุมถึง"""
+    """rescore_state.json / scan_log.csv / job_state.json (ผ่าน last_run) / last_alive.json
+    เป็น state จริงของเครื่อง — rescore.run และ last_run อ่าน path จาก attribute ของโมดูล
+    ณ เวลาเรียก redirect ตรงนี้จึงคุมถึง"""
     monkeypatch.setattr(rescore, "STATE_PATH", tmp_path / "rescore_state.json")
     monkeypatch.setattr(scan_csv, "SCAN_CSV_PATH", tmp_path / "scan_log.csv")
     monkeypatch.setattr(jobstate, "JOB_STATE_PATH", tmp_path / "job_state.json")
+    monkeypatch.setattr(jobstate, "ALIVE_PATH", tmp_path / "last_alive.json")
 
 
 @pytest.fixture(autouse=True)

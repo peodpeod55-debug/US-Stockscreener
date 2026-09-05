@@ -16,7 +16,7 @@ from telegram.ext import (
     filters,
 )
 
-from bot import fetch_cache, instance_lock, rescore
+from bot import fetch_cache, instance_lock, jobstate, rescore
 from bot.breakouts import record_breakouts
 from bot.buttons import (
     add_plan_button,
@@ -55,7 +55,7 @@ from bot.hot import classify_watch
 from bot.levels import below_low_5d
 from bot.jobstate import (PUSH_WEEKDAYS, already_ran, claim, due_catchup,
                           last_breakout_bar, last_run, release,
-                          set_breakout_bar, widen_lookback)
+                          set_breakout_bar, widen_lookback, write_alive)
 from bot.lookup import LOOKUP_MAX, SET_RULE, lookup_symbol, parse_tickers
 from bot.nasdaq_cal import fetch_nasdaq_earnings
 from bot.plan import (PLAN_MAX, build_plan, parse_plan_command,
@@ -755,6 +755,7 @@ async def _run_claimed(context, name, work):
         return
     try:
         await work()
+        logger.info("%s: สำเร็จ", name)
     except Exception as e:
         logger.exception("%s job failed", name)
         key = (name, date.today().isoformat())
@@ -968,6 +969,11 @@ async def catchup_job(context: ContextTypes.DEFAULT_TYPE):
         await jobs[name](context)
 
 
+async def alive_job(context):
+    """ทุก 5 นาที: heartbeat ให้ watchdog (ไม่แตะ Telegram)"""
+    write_alive(datetime.now(TZ))
+
+
 async def _safe_answer(query, text=None):
     """ตอบ callback เสมอ (ปุ่มค้างหมุนติ้วถ้าไม่ตอบ) — query เก่าเกิน answer ล้มได้ ไม่เป็นไร"""
     try:
@@ -1093,6 +1099,7 @@ def build_app(config):
     # catch-up วนซ้ำ: รอบแรกเก็บ job ที่พลาดตอนเครื่องปิด/หลับ รอบถัดๆ ไป
     # retry job ที่ล้มแล้วถูกคืน claim (_run_claimed) — กันซ้ำด้วย claim
     app.job_queue.run_repeating(catchup_job, interval=CATCHUP_INTERVAL, first=15)
+    app.job_queue.run_repeating(alive_job, interval=jobstate.ALIVE_INTERVAL, first=10)   # heartbeat ให้ watchdog
     return app
 
 

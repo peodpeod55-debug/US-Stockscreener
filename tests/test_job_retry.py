@@ -8,6 +8,7 @@ reminder/weekly ล้มโดยไม่แจ้งผู้ใช้เล�
 ล้มครบ JOB_MAX_TRIES ครั้ง → เก็บ claim ไว้ (เลิกลองวันนี้) กันสแปม/เผางบ API
 """
 import asyncio
+import logging
 from types import SimpleNamespace
 
 import pytest
@@ -56,6 +57,27 @@ def test_success_claims_and_stays_quiet(env):
     assert ran == [1]
     assert jobstate.already_ran("scan", path=env.state) is True
     assert env.bot.sent == []
+
+
+def test_success_logs_one_info_line(env, caplog):
+    """สำเร็จ → log บรรทัดเดียว "<name>: สำเร็จ" (logger "bot") ให้ /status/log grep ตามได้"""
+    async def work():
+        pass
+
+    with caplog.at_level(logging.INFO, logger="bot"):
+        _run(env, "scan", work)
+    records = [r.getMessage() for r in caplog.records if r.name == "bot"]
+    assert records == ["scan: สำเร็จ"]
+
+
+def test_failure_does_not_log_success_line(env, caplog):
+    async def work():
+        raise RuntimeError("boom")
+
+    with caplog.at_level(logging.INFO, logger="bot"):
+        _run(env, "scan", work)
+    assert not any("สำเร็จ" in r.getMessage()
+                   for r in caplog.records if r.name == "bot")
 
 
 def test_already_claimed_skips_work(env):

@@ -4,12 +4,16 @@ state file: job_state.json = {job_name: วันที่รันล่าส�
 job "claim" วันของตัวเองก่อนทำงาน → restart กี่รอบก็ไม่ส่งซ้ำ
 """
 import json
+import logging
 from datetime import date, time
 
 from bot.config import PROJECT_ROOT
 from bot.fileio import write_json_atomic
 
 JOB_STATE_PATH = PROJECT_ROOT / "job_state.json"
+# heartbeat ให้ watchdog นอก process (tools/bot_watchdog.py) ดู mtime — บอทไม่อ่านไฟล์นี้เอง
+ALIVE_PATH = PROJECT_ROOT / "last_alive.json"
+ALIVE_INTERVAL = 300            # วินาที — เท่าบอทไทย (alive_job)
 
 PUSH_WEEKDAYS = {1, 2, 3, 4, 5}  # date.weekday(): จ=0 → อังคาร(1)–เสาร์(5)
 _ALL_DAYS = set(range(7))
@@ -124,3 +128,11 @@ def due_catchup(now):
         return []
     return [name for name, t, days in SCHEDULE
             if now.weekday() in days and now.time() >= t]
+
+
+def write_alive(now, path=None):
+    """จดเวลาว่ายังทำงาน — {"ts": ISO} เขียนแบบ atomic · ล้มแค่ log ไม่ให้ job queue พัง"""
+    try:
+        write_json_atomic(path or ALIVE_PATH, {"ts": now.isoformat()})
+    except OSError:
+        logging.getLogger(__name__).warning("เขียน last_alive.json ไม่สำเร็จ", exc_info=True)

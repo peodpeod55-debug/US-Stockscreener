@@ -1,10 +1,13 @@
+import json
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from bot.jobstate import (already_ran, claim, due_catchup, last_run, release,
-                          widen_lookback)
+                          widen_lookback, write_alive)
 
 TUE = date(2026, 8, 18)
 WED = date(2026, 8, 19)
+TZ = ZoneInfo("Asia/Bangkok")
 
 
 # ── claim / already_ran (state file) ─────────────────────────────
@@ -125,3 +128,25 @@ def test_widen_lookback_covers_downtime_gap():
     assert widen_lookback(2, date(2026, 8, 13), today) == 5  # หาย 5 วัน → ย้อน 5
     assert widen_lookback(2, date(2026, 7, 1), today) == 14  # หายนาน → เพดาน 14
     assert widen_lookback(2, date(2026, 7, 1), today, cap=7) == 7
+
+
+# ── write_alive (heartbeat ให้ tools/bot_watchdog.py ดู mtime) ───
+
+def test_write_alive_writes_ts_isoformat(tmp_path):
+    p = tmp_path / "a.json"
+    write_alive(datetime(2026, 8, 25, 9, 0, tzinfo=TZ), p)
+    assert json.loads(p.read_text(encoding="utf-8")) == {
+        "ts": "2026-08-25T09:00:00+07:00"}
+
+
+def test_write_alive_unwritable_path_logs_warning_not_raises(tmp_path, caplog):
+    # เขียนทับ path ที่เป็นโฟลเดอร์ (ไม่ใช่ไฟล์) — OSError แต่ต้องไม่ raise ออกมา
+    bad = tmp_path / "a_dir"
+    bad.mkdir()
+    with caplog.at_level("WARNING"):
+        write_alive(datetime(2026, 8, 25, 9, 0, tzinfo=TZ), bad)
+    # เจาะจง logger "bot.jobstate" + ข้อความมี "last_alive.json" — กัน WARNING ของ lib อื่นสอบผ่านมั่ว
+    warnings = [r for r in caplog.records
+                if r.levelname == "WARNING" and r.name == "bot.jobstate"]
+    assert warnings
+    assert "last_alive.json" in warnings[0].getMessage()

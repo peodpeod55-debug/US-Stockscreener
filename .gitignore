@@ -3,9 +3,11 @@ reports/
 watchlist.json
 auto_watch.json
 job_state.json
+last_alive.json
 __pycache__/
 *.pyc
 bot.log
+bot.log.*
 .pytest_cache/
 *.tmp
 pending.json
