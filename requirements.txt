@@ -2,4 +2,7 @@ python-telegram-bot[job-queue]>=22.7
 python-dotenv>=1.0
 requests>=2.31
 mplfinance>=0.12
+# mplfinance 0.12.x import six แต่ไม่ประกาศเป็น dependency — เดิมได้มากับ python-dateutil<3
+# (dateutil 3+ เลิกพึ่ง six: ติดตั้งใหม่แล้ว import bot.chart พัง = บอทไม่ขึ้น · CI แดง 12 พ.ย. 2026)
+six>=1.16
 pytest>=8.0
