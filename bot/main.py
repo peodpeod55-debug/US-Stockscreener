@@ -50,6 +50,7 @@ from bot.formatter import (
     format_status,
     format_watch_detail,
     format_weekly,
+    split_blocks,
 )
 from bot.hot import classify_watch
 from bot.levels import below_low_5d
@@ -802,7 +803,8 @@ async def reminder_job(context: ContextTypes.DEFAULT_TYPE):
 
 
 async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
-    """เช้าอังคาร–เสาร์ (หลังได้ EOD คืนก่อน): หุ้นที่ติดตามตัวไหนเพิ่งทะลุแนว/หลุด SL"""
+    """เช้าจันทร์–เสาร์ (หลังได้ EOD คืนก่อน · จันทร์ = เก็บแท่งศุกร์ที่รอบเสาร์พลาด):
+    หุ้นที่ติดตามตัวไหนเพิ่งทะลุแนว/หลุด SL"""
     if datetime.now(TZ).weekday() not in PUSH_WEEKDAYS:
         return
 
@@ -887,7 +889,9 @@ async def _send_weekly(bot, chat_id, notify_empty=False):
         build_weekly_items, signals, lambda sym: _weekly_get_prices(client, sym))
     msg = format_weekly(items)
     if msg:
-        await bot.send_message(chat_id=chat_id, text=msg)
+        # ฤดูงบสัญญาณเกือบร้อยตัว ข้อความเดียวเกินเพดาน Telegram → แบ่งที่ขอบรายการ
+        for part in split_blocks(msg):
+            await bot.send_message(chat_id=chat_id, text=part)
     elif notify_empty:
         await bot.send_message(
             chat_id=chat_id,
@@ -925,10 +929,10 @@ async def _send_status(bot, chat_id):
 
 
 async def weekly_job(context: ContextTypes.DEFAULT_TYPE):
-    """อาทิตย์เช้า: ดึงคลังวันงบล่วงหน้าถึง +35 วัน แล้วสรุปว่าหุ้นที่บอทเคยแจ้งเป็นยังไงบ้าง"""
-    if datetime.now(TZ).weekday() != 6:  # อาทิตย์
-        return
+    """สัปดาห์ละครั้ง 09:00 (ปกติอาทิตย์เช้า — เครื่องปิดวันอาทิตย์ก็ส่งครั้งแรกที่เปิดในสัปดาห์นั้น):
+    ดึงคลังวันงบล่วงหน้าถึง +35 วัน แล้วสรุปว่าหุ้นที่บอทเคยแจ้งเป็นยังไงบ้าง
 
+    ลงตารางทุกวัน — กันซ้ำรายสัปดาห์อยู่ใน claim (jobstate.done_for: anchor วันอาทิตย์ล่าสุด)"""
     async def work():
         today = datetime.now(TZ).date()
         client = FMPClient(api_key=CONFIG.fmp_api_key, max_api_calls=4)
@@ -1094,7 +1098,7 @@ def build_app(config):
     app.job_queue.run_daily(reminder_job, time=time(8, 25, tzinfo=TZ))
     # เตือนทะลุแนวเฉพาะหลังวันซื้อขาย US (เช็ค weekday ใน callback)
     app.job_queue.run_daily(breakout_job, time=time(8, 20, tzinfo=TZ))
-    # สรุปผลรายสัปดาห์ เช้าวันอาทิตย์ (เช็ค weekday ใน callback)
+    # สรุปผลรายสัปดาห์ — ลงทุกวัน 09:00 แต่ส่งจริงสัปดาห์ละครั้ง (claim กันซ้ำด้วย anchor วันอาทิตย์)
     app.job_queue.run_daily(weekly_job, time=time(9, 0, tzinfo=TZ))
     # catch-up วนซ้ำ: รอบแรกเก็บ job ที่พลาดตอนเครื่องปิด/หลับ รอบถัดๆ ไป
     # retry job ที่ล้มแล้วถูกคืน claim (_run_claimed) — กันซ้ำด้วย claim
@@ -1115,7 +1119,9 @@ def main():
     CONFIG = load_config()
     app = build_app(CONFIG)
     logger.info("bot starting")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    # bootstrap_retries=-1: บูตตอนเน็ตยังไม่มา (เครื่องเพิ่งเปิด) ให้ลองต่อจนติด — ค่าเริ่มต้น 0
+    # คือล้มครั้งแรกแล้ว process ตาย ทิ้ง ERROR ใน bot.log ให้ /status ฟ้องทั้งวันทั้งที่บอทปกติ
+    app.run_polling(allowed_updates=Update.ALL_TYPES, bootstrap_retries=-1)
 
 
 if __name__ == "__main__":

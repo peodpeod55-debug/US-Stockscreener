@@ -48,7 +48,7 @@ def test_all_morning_jobs_done_on_weekday_afternoon():
     assert jobs["breakout"]["state"] == "done"
     assert jobs["reminder"]["state"] == "done"
     assert jobs["scan"]["state"] == "done"
-    assert jobs["weekly"]["state"] == "off"          # ไม่มีรอบวันพฤหัส
+    assert jobs["weekly"]["state"] == "done"         # ส่งแล้วเมื่ออาทิตย์ 23 ส.ค. = รอบสัปดาห์นี้
     assert jobs["weekly"]["last"] == "2026-08-23"
 
 

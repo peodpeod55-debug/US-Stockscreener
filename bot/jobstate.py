@@ -5,7 +5,7 @@ job "claim" วันของตัวเองก่อนทำงาน → 
 """
 import json
 import logging
-from datetime import date, time
+from datetime import date, time, timedelta
 
 from bot.config import PROJECT_ROOT
 from bot.fileio import write_json_atomic
@@ -15,7 +15,11 @@ JOB_STATE_PATH = PROJECT_ROOT / "job_state.json"
 ALIVE_PATH = PROJECT_ROOT / "last_alive.json"
 ALIVE_INTERVAL = 300            # วินาที — เท่าบอทไทย (alive_job)
 
-PUSH_WEEKDAYS = {1, 2, 3, 4, 5}  # date.weekday(): จ=0 → อังคาร(1)–เสาร์(5)
+# date.weekday(): จ=0 → จันทร์(0)–เสาร์(5) · session US ของวัน X ได้แท่ง EOD เช้าวัน X+1 (ไทย)
+# จันทร์อยู่ด้วยเพื่อเก็บ session ศุกร์ที่รอบเสาร์พลาด (เครื่องไม่เปิดเสาร์ = เตือนทะลุแนว/หลุด SL
+# ของแท่งศุกร์เคยหายถาวร เพราะ detector เทียบแค่ 1 แท่ง) — เสาร์รันไปแล้วก็ไม่ซ้ำ: breakout
+# ข้ามเองด้วย guard breakout_bar · scan ใช้หน้าต่าง widen_lookback จาก last_run
+PUSH_WEEKDAYS = {0, 1, 2, 3, 4, 5}
 _ALL_DAYS = set(range(7))
 
 # job เช้าที่ catch-up ได้ (เรียงตามเวลา)
@@ -23,8 +27,13 @@ SCHEDULE = [
     ("breakout", time(8, 20), PUSH_WEEKDAYS),
     ("reminder", time(8, 25), _ALL_DAYS),
     ("scan", time(8, 30), PUSH_WEEKDAYS),
-    ("weekly", time(9, 0), {6}),
+    ("weekly", time(9, 0), _ALL_DAYS),
 ]
+
+# job รายสัปดาห์: "ทำแล้ว" = ทำตั้งแต่วันอาทิตย์ล่าสุดเป็นต้นมา (ไม่ใช่ "ทำวันนี้") — ลงตารางทุกวัน
+# แล้วให้ anchor กันซ้ำ → ส่งครั้งแรกที่เครื่องเปิดหลัง 09:00 ในสัปดาห์นั้น (แบบเดียวกับปฏิทินงบ
+# ของบอทไทย) · เดิมรันได้เฉพาะเช้าวันอาทิตย์ = ไม่เปิดเครื่องวันอาทิตย์แล้วสัปดาห์นั้นหายทั้งรอบ
+WEEKLY_JOBS = {"weekly"}
 
 # ขอบบนของหน้าต่าง catch-up — ตลาด US เปิดเร็วสุด 20:30 ไทย (ช่วง DST) แล้วแท่ง [0]
 # จาก Yahoo กลายเป็นแท่ง intraday ยังไม่ปิด: breakout/scan จะอ่านค่าเพี้ยนแล้วเขียน
@@ -45,16 +54,35 @@ def _load(path):
     return data if isinstance(data, dict) else {}
 
 
+def week_anchor(today):
+    """วันอาทิตย์ล่าสุด (วันนี้เองถ้าเป็นวันอาทิตย์) — จุดเริ่มรอบของ job รายสัปดาห์"""
+    return today - timedelta(days=(today.weekday() + 1) % 7)
+
+
+def done_for(job, last_iso, today):
+    """ค่าที่จดไว้ (วัน ISO ที่รันล่าสุด) นับว่า "รอบปัจจุบันทำแล้ว" ไหม
+
+    รายวัน: ต้องเป็นวันนี้ · รายสัปดาห์ (WEEKLY_JOBS): ตั้งแต่วันอาทิตย์ล่าสุดเป็นต้นมา
+    ค่าว่าง/เพี้ยน = ยังไม่ทำ
+    """
+    if job not in WEEKLY_JOBS:
+        return last_iso == today.isoformat()
+    try:
+        return date.fromisoformat(last_iso) >= week_anchor(today)
+    except (TypeError, ValueError):
+        return False
+
+
 def already_ran(job, path=JOB_STATE_PATH, today=None):
     today = today or date.today()
-    return _load(path).get(job) == today.isoformat()
+    return done_for(job, _load(path).get(job), today)
 
 
 def claim(job, path=JOB_STATE_PATH, today=None):
-    """จองสิทธิ์รัน job วันนี้ — False ถ้ามีคนรันไปแล้ว (ไม่ต้องรันซ้ำ)"""
+    """จองสิทธิ์รัน job รอบนี้ (รายวัน = วันนี้ · รายสัปดาห์ = สัปดาห์นี้) — False ถ้ารันไปแล้ว"""
     today = today or date.today()
     data = _load(path)
-    if data.get(job) == today.isoformat():
+    if done_for(job, data.get(job), today):
         return False
     data[job] = today.isoformat()
     write_json_atomic(path, data)

@@ -356,6 +356,25 @@ def format_low_breaks(snaps, removed=()):
     return "\n".join(lines)
 
 
+def split_blocks(text, limit=MAX_LEN):
+    """แบ่งข้อความยาวที่ขอบบล็อก (บรรทัดว่าง) ให้แต่ละฉบับ ≤ limit — บล็อกหนึ่ง (เช่น หุ้นหนึ่งตัว) ไม่ถูกผ่ากลาง
+
+    Telegram ปฏิเสธข้อความเกิน 4096 — สรุปรายสัปดาห์ช่วงฤดูงบ (เกือบร้อยสัญญาณ) ยาว ~8,500 ตัวอักษร
+    """
+    if len(text) <= limit:
+        return [text]
+    out, cur = [], ""
+    for block in text.split("\n\n"):
+        if cur and len(cur) + 2 + len(block) > limit:
+            out.append(cur)
+            cur = block
+        else:
+            cur = block if not cur else cur + "\n\n" + block
+    if cur:
+        out.append(cur)
+    return out
+
+
 def format_weekly(items):
     """สรุปผลหุ้นที่เคยแจ้ง (PEAD drift) — None ถ้าไม่มีสัญญาณในช่วงที่ดู"""
     if not items:
@@ -714,7 +733,10 @@ def format_status(st):
         icon = _JOB_ICON.get(j["state"], "?")
         last = f" · ล่าสุด {j['last']}" if j.get("last") else ""
         if j["state"] == "done":
-            lines.append(f"{icon} {label}")
+            # weekly ที่ส่งไปแล้ววันอื่นของสัปดาห์นี้ — บอกวัน ไม่งั้นอ่านเป็น "ส่งวันนี้"
+            when = (f" · ส่งแล้ว {j['last']}"
+                    if j.get("last") and j["last"] != now.date().isoformat() else "")
+            lines.append(f"{icon} {label}{when}")
         elif j["state"] == "due":
             lines.append(f"{icon} {label} — ถึงเวลาแล้วยังไม่รัน "
                          f"(catch-up ลองทุก 30 น.){last}")

@@ -79,18 +79,19 @@ def test_mid_morning_partial():
 
 
 def test_after_all_morning_jobs_on_push_day():
-    # อังคาร 09:30 — breakout/reminder/scan ผ่านหมด, weekly ไม่ใช่วันอาทิตย์
+    # อังคาร 09:30 — ผ่านหมดทุกตัว · weekly ลงตารางทุกวัน (กันซ้ำรายสัปดาห์อยู่ที่ claim/already_ran)
     assert due_catchup(datetime(2026, 8, 18, 9, 30)) == [
-        "breakout", "reminder", "scan"]
+        "breakout", "reminder", "scan", "weekly"]
 
 
 def test_sunday_has_reminder_and_weekly_only():
     assert due_catchup(datetime(2026, 8, 23, 9, 30)) == ["reminder", "weekly"]
 
 
-def test_monday_reminder_only():
-    # จันทร์ไม่ใช่วัน push (ตลาด US หยุดเสาร์-อาทิตย์) แต่เตือนวันงบรันทุกวัน
-    assert due_catchup(datetime(2026, 8, 24, 9, 30)) == ["reminder"]
+def test_monday_is_a_push_day_too():
+    # จันทร์ = เก็บ session ศุกร์ที่รอบเสาร์พลาด (เดิมจันทร์มีแต่เตือนวันงบ → แท่งศุกร์หายถาวร
+    # เมื่อเสาร์ไม่เปิดเครื่อง) — กันซ้ำด้วย guard breakout_bar / หน้าต่าง widen_lookback
+    assert due_catchup(datetime(2026, 8, 24, 8, 35)) == ["breakout", "reminder", "scan"]
 
 
 def test_evening_us_session_nothing_due():
@@ -102,7 +103,7 @@ def test_evening_us_session_nothing_due():
 def test_catchup_window_upper_bound():
     # 19:59 ยังเก็บตกได้ · 20:00 ปิดหน้าต่าง (ตลาด US เปิดเร็วสุด 20:30 ไทยช่วง DST)
     assert due_catchup(datetime(2026, 8, 18, 19, 59)) == [
-        "breakout", "reminder", "scan"]
+        "breakout", "reminder", "scan", "weekly"]
     assert due_catchup(datetime(2026, 8, 18, 20, 0)) == []
 
 

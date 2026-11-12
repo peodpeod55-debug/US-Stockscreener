@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 from bot import rescore
 from bot.config import PROJECT_ROOT
 from bot.jobstate import JOB_STATE_PATH, SCHEDULE, _load as _load_job_state
+from bot.jobstate import done_for
 from bot.pending import load_pending
 from bot.signals import load_signals
 from bot.watchlist import AUTO_WATCH_PATH, WATCHLIST_PATH, active_auto, load_watchlist
@@ -59,16 +60,16 @@ STARTED_COMMIT = read_head_commit()
 def job_states(now, state):
     """สถานะ job เช้าแต่ละตัว ณ เวลา now เทียบ job_state.json (dict {job: วัน ISO})
 
-    done = รันวันนี้แล้ว · due = ถึงเวลาแล้วยังไม่รัน (catch-up จะเก็บ) ·
-    pending = ยังไม่ถึงเวลา · off = ไม่มีรอบวันนี้ (เช่น weekly นอกวันอาทิตย์)
+    done = รันรอบนี้แล้ว (รายวัน = วันนี้ · weekly = ตั้งแต่อาทิตย์ล่าสุด — ดู jobstate.done_for) ·
+    due = ถึงเวลาแล้วยังไม่รัน (catch-up จะเก็บ) · pending = ยังไม่ถึงเวลา ·
+    off = ไม่มีรอบวันนี้ (เช่น สแกน/ทะลุแนว วันอาทิตย์)
     """
-    today = now.date().isoformat()
     out = []
     for name, t, days in SCHEDULE:
         last = state.get(name)
         if now.weekday() not in days:
             st = "off"
-        elif last == today:
+        elif done_for(name, last, now.date()):
             st = "done"
         elif now.time() >= t:
             st = "due"
