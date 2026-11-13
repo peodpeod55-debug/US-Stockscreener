@@ -169,3 +169,121 @@ def test_breakout_bar_key_ignored_by_catchup_claim_and_status(tmp_path):
     # status.job_states อ่านทีละชื่อจาก SCHEDULE เหมือนกัน — ไม่หยิบ breakout_bar มาโชว์เป็น job
     states = status.job_states(NOW, jobstate._load(path))
     assert {s["name"] for s in states} == {"breakout", "reminder", "scan", "weekly"}
+
+
+# ── f. แท่งที่พลาดระหว่างรอบ (เครื่องปิดกลางสัปดาห์/วันหยุดไทย) ─────────
+# detector เดิมเทียบแค่แท่งล่าสุดกับแท่งก่อนหน้า — รอบที่ข้ามไป 1 วัน edge ของแท่งนั้นหายถาวร
+# ของใหม่: ขอ snapshot ย้อนของทุกแท่งที่ใหม่กว่า breakout_bar (main.missed_snapshots)
+
+def _late(symbol, last_date, **over):
+    return _snap(symbol, last_date, late=True, now_price=110.0, **over)
+
+
+def _quiet(symbol, last_date):
+    """แท่งล่าสุดไม่มี edge อะไรเลย — ของเดิมจึงเงียบทั้งรอบ"""
+    return _snap(symbol, last_date, new_breaks=[])
+
+
+@pytest.fixture
+def missed(env, monkeypatch):
+    """main.missed_snapshots ปลอม — เก็บ args ที่ถูกเรียก + คืน snapshot ย้อนตามที่เทสต์ตั้ง"""
+    table, calls = {}, []
+
+    def fake(symbol, universe, since):
+        calls.append((symbol, since))
+        return table.get(symbol, [])
+
+    monkeypatch.setattr(main, "missed_snapshots", fake)
+    return SimpleNamespace(table=table, calls=calls)
+
+
+def test_skipped_bar_breakout_is_alerted_late(env, missed):
+    jobstate.set_breakout_bar("2026-09-03", path=env.state)     # รอบล่าสุดเห็นถึงแท่งพฤหัส
+    env.snaps["NVDA"] = _quiet("NVDA", "2026-09-08")            # วันนี้เห็นแท่งอังคาร
+    missed.table["NVDA"] = [_late("NVDA", "2026-09-04")]        # แท่งศุกร์ที่ข้ามไปทะลุแนว
+
+    _run(env)
+
+    assert missed.calls == [("NVDA", "2026-09-03")]
+    text = "\n".join(env.bot.sent)
+    assert "NVDA" in text and "แจ้งย้อนหลัง — แท่ง 2026-09-04" in text
+    assert env.record_calls == [missed.table["NVDA"]]           # ลง breakouts.json ด้วยวันแท่งจริง
+    assert jobstate.last_breakout_bar(path=env.state) == "2026-09-08"
+
+
+def test_skipped_bar_sl_low_and_pullback_are_alerted_late(env, missed):
+    jobstate.set_breakout_bar("2026-09-03", path=env.state)
+    env.snaps["NVDA"] = _quiet("NVDA", "2026-09-08")
+    missed.table["NVDA"] = [_late("NVDA", "2026-09-04", new_breaks=[], sl_break=True,
+                                  low_break=True, gap_pullback=True)]
+
+    _run(env)
+
+    heads = [m.splitlines()[0] for m in env.bot.sent]
+    assert any(h.startswith("🛑 หลุด SL") for h in heads)
+    assert any(h.startswith("⛔ หลุด Low") for h in heads)
+    assert any(h.startswith("🔽 ย่อเข้าโซน gap") for h in heads)
+    assert all("แจ้งย้อนหลัง — แท่ง 2026-09-04" in m for m in env.bot.sent)
+
+
+def test_late_alerts_come_before_latest_bar_alert(env, missed):
+    jobstate.set_breakout_bar("2026-09-03", path=env.state)
+    env.snaps["NVDA"] = _snap("NVDA", "2026-09-08")             # แท่งล่าสุดก็ทะลุ (อีกแนว)
+    missed.table["NVDA"] = [_late("NVDA", "2026-09-04")]
+
+    _run(env)
+
+    assert env.record_calls == [[missed.table["NVDA"][0], env.snaps["NVDA"]]]
+    msg = next(m for m in env.bot.sent if m.startswith("🚀"))
+    assert msg.count("แจ้งย้อนหลัง") == 1                        # แท่งล่าสุดไม่ติดป้าย
+
+
+def test_first_run_does_not_replay_history(env, missed):
+    env.snaps["NVDA"] = _snap("NVDA", "2026-09-08")              # ยังไม่เคยมี breakout_bar
+
+    _run(env)
+
+    assert missed.calls == []
+
+
+def test_duplicate_bar_round_does_not_replay(env, missed):
+    jobstate.set_breakout_bar("2026-09-08", path=env.state)
+    env.snaps["NVDA"] = _snap("NVDA", "2026-09-08")
+    missed.table["NVDA"] = [_late("NVDA", "2026-09-04")]
+
+    _run(env)
+
+    assert env.bot.sent == [] and env.record_calls == []
+
+
+def test_late_alert_does_not_drive_auto_remove(env, missed, monkeypatch):
+    """เก็บกวาด auto-watch ดูสถานะแท่งล่าสุดเท่านั้น — แท่งย้อนที่ปิดใต้ low ไม่นับ"""
+    monkeypatch.setattr(main, "active_auto", lambda: {"NVDA": "2026-08-01"})
+    jobstate.set_breakout_bar("2026-09-03", path=env.state)
+    env.snaps["NVDA"] = _quiet("NVDA", "2026-09-08")            # แท่งล่าสุดกลับมายืนเหนือ low แล้ว
+    missed.table["NVDA"] = [_late(
+        "NVDA", "2026-09-04", new_breaks=[], low_break=True,
+        levels={"high_5d": 100.0, "low_5d": 200.0, "sl": 90.0,
+                "d0_open": 95.0, "d0_high": 101.0, "price": 102.0})]
+
+    _run(env)
+
+    assert env.remove_calls == []
+    assert any(m.startswith("⛔ หลุด Low") for m in env.bot.sent)   # แต่ยังแจ้งย้อนหลัง
+
+
+def test_late_chart_caption_uses_latest_close(env, missed, monkeypatch):
+    """กราฟที่แนบคือกราฟปัจจุบัน — caption ต้องเป็นราคาปิดล่าสุด ไม่ใช่ของแท่งย้อน"""
+    captions = []
+
+    async def fake_chart(bot, chat_id, symbol, levels=None, caption=None, **kw):
+        captions.append(caption)
+
+    monkeypatch.setattr(main, "_send_chart", fake_chart)
+    jobstate.set_breakout_bar("2026-09-03", path=env.state)
+    env.snaps["NVDA"] = _quiet("NVDA", "2026-09-08")
+    missed.table["NVDA"] = [_late("NVDA", "2026-09-04")]         # price 102 · now_price 110
+
+    _run(env)
+
+    assert captions == ["🚀 ทะลุแนว NVDA — ปิด 110.00"]

@@ -203,6 +203,19 @@ _BREAK_TH = {"high_5d": "High 5 วันก่อนงบ", "high_3m": "High 3
              "d0_high": "High วันงบ"}
 
 
+def _late_line(s):
+    """บรรทัดป้าย "แจ้งย้อนหลัง" ของ snapshot แท่งที่บอทข้ามไป (lookup.missed_snapshots) — ไม่ใช่ = None
+
+    ตัวเลขในบล็อก (ปิด/low/วอลุ่ม) เป็นของแท่งนั้น จึงต้องบอกวันแท่ง + ราคาปิดล่าสุดจริงกำกับ
+    """
+    if not s.get("late"):
+        return None
+    line = f"⏪ แจ้งย้อนหลัง — แท่ง {s['last_date']}"
+    if s.get("now_price") is not None:
+        line += f" · ปิดล่าสุด {s['now_price']:,.2f}"
+    return line
+
+
 def format_breakouts(snaps):
     """ข้อความเตือนทะลุแนวจาก snapshot ที่ new_breaks ไม่ว่าง — None ถ้าไม่มี"""
     if not snaps:
@@ -212,6 +225,8 @@ def format_breakouts(snaps):
         icon = GRADE_ICON.get(s.get("grade"), "⚪")
         lines.append("")
         lines.append(f"{icon} {s['symbol']} — {s['name']}")
+        if _late_line(s):
+            lines.append(_late_line(s))
         lines.append(f"💰 ปิด {s['price']:,.2f} ({_signed(s['day_change_pct'])})")
         broke = " · ".join(
             f"{_BREAK_TH[k]} ({s['levels'][k]:,.2f})" for k in s["new_breaks"])
@@ -233,6 +248,8 @@ def format_sl_breaks(snaps):
         icon = GRADE_ICON.get(s.get("grade"), "⚪")
         lines.append("")
         lines.append(f"{icon} {s['symbol']} — {s['name']}")
+        if _late_line(s):
+            lines.append(_late_line(s))
         lines.append(f"💰 ปิด {s['price']:,.2f} ({_signed(s['day_change_pct'])}) · "
                      f"low {s['low']:,.2f}")
         lines.append(f"🛑 ต่ำกว่า SL (low วันงบ): {s['levels']['sl']:,.2f}")
@@ -251,6 +268,8 @@ def format_gap_pullbacks(snaps):
         lv = s["levels"]
         lines.append("")
         lines.append(f"{icon} {s['symbol']} — {s['name']}")
+        if _late_line(s):
+            lines.append(_late_line(s))
         lines.append(f"💰 ปิด {s['price']:,.2f} ({_signed(s['day_change_pct'])}) · "
                      f"low {s['low']:,.2f}")
         lines.append(f"🔽 แตะ D0 Open {lv['d0_open']:,.2f} · ยังเหนือ SL {lv['sl']:,.2f}")
@@ -345,6 +364,8 @@ def format_low_breaks(snaps, removed=()):
         icon = GRADE_ICON.get(s.get("grade"), "⚪")
         lines.append("")
         lines.append(f"{icon} {s['symbol']} — {s['name']}")
+        if _late_line(s):
+            lines.append(_late_line(s))
         lines.append(f"💰 ปิด {s['price']:,.2f} ({_signed(s['day_change_pct'])}) · "
                      f"low {s['low']:,.2f}")
         lines.append(f"⛔ ต่ำกว่า Low 5 วันก่อนงบ: {s['levels']['low_5d']:,.2f} "

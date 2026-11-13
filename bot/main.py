@@ -57,7 +57,8 @@ from bot.levels import below_low_5d
 from bot.jobstate import (PUSH_WEEKDAYS, already_ran, claim, due_catchup,
                           last_breakout_bar, last_run, release,
                           set_breakout_bar, widen_lookback, write_alive)
-from bot.lookup import LOOKUP_MAX, SET_RULE, lookup_symbol, parse_tickers
+from bot.lookup import (LOOKUP_MAX, SET_RULE, lookup_symbol, missed_snapshots,
+                        parse_tickers)
 from bot.nasdaq_cal import fetch_nasdaq_earnings
 from bot.plan import (PLAN_MAX, build_plan, parse_plan_command,
                       plan_unavailable_reason, rank_drs)
@@ -804,7 +805,8 @@ async def reminder_job(context: ContextTypes.DEFAULT_TYPE):
 
 async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
     """เช้าจันทร์–เสาร์ (หลังได้ EOD คืนก่อน · จันทร์ = เก็บแท่งศุกร์ที่รอบเสาร์พลาด):
-    หุ้นที่ติดตามตัวไหนเพิ่งทะลุแนว/หลุด SL"""
+    หุ้นที่ติดตามตัวไหนเพิ่งทะลุแนว/หลุด SL — เช็คทุกแท่งที่ใหม่กว่าแท่งล่าสุดที่เคยแจ้ง
+    (breakout_bar) ไม่ใช่แค่แท่งล่าสุด: วันที่บอทไม่ได้รัน รอบถัดไปแจ้งย้อนหลังให้"""
     if datetime.now(TZ).weekday() not in PUSH_WEEKDAYS:
         return
 
@@ -818,6 +820,7 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
         auto = active_auto()
         alerts, sl_alerts, low_alerts, pull_alerts, dead = [], [], [], [], []
         bar_dates = []           # prices[0]["date"] ของทุกตัวที่ดึงราคาได้ — เทียบหาแท่งซ้ำ
+        last_bar = last_breakout_bar()   # แท่งล่าสุดที่รอบก่อนแจ้งจบไปแล้ว (None = ยังไม่เคย)
         await asyncio.to_thread(prefetch, symbols, 250, client)  # ดึงขนานก่อน
         for sym in symbols:
             try:
@@ -825,16 +828,27 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 logger.exception("breakout check %s failed", sym)
                 continue
+            bars = []            # snapshot ที่ต้องเช็ค edge: แท่งที่ข้ามไป (เก่า→ใหม่) แล้วแท่งล่าสุด
             if snap:
                 bar_dates.append(snap["last_date"])
-            if snap and snap.get("new_breaks"):
-                alerts.append(snap)
-            if snap and snap.get("sl_break"):
-                sl_alerts.append(snap)
-            if snap and snap.get("low_break"):
-                low_alerts.append(snap)
-            if snap and snap.get("gap_pullback"):
-                pull_alerts.append(snap)
+                # detector เป็น edge 1 แท่ง — รอบที่บอทไม่ได้รัน (เครื่องปิด/วันหยุดไทย) ต้องคิดย้อน
+                # ทุกแท่งที่ใหม่กว่าแท่งล่าสุดที่เคยแจ้ง ไม่งั้น edge ของแท่งนั้นหายถาวร
+                if last_bar and snap["last_date"] > last_bar:
+                    try:
+                        bars += await asyncio.to_thread(
+                            missed_snapshots, sym, universe, last_bar)
+                    except Exception:
+                        logger.exception("breakout missed bars %s failed", sym)
+                bars.append(snap)
+            for s in bars:
+                if s.get("new_breaks"):
+                    alerts.append(s)
+                if s.get("sl_break"):
+                    sl_alerts.append(s)
+                if s.get("low_break"):
+                    low_alerts.append(s)
+                if s.get("gap_pullback"):
+                    pull_alerts.append(s)
             # ปิดใต้ low ก่อนงบ = setup จบ → เก็บกวาดออกจาก auto-watch
             # (state ไม่ใช่ edge — ตัวที่หลุดค้างมาหลายวันก็โดนเก็บ) manual ไม่แตะ
             if snap and sym in auto and below_low_5d(snap.get("levels")):
@@ -843,7 +857,7 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
         # (เช่น อังคารหลัง Labor Day ยังเห็นแท่งศุกร์ตัวเดิมที่รอบเสาร์ประมวลผลไปแล้ว) —
         # ข้ามทั้งรอบกันแจ้งซ้ำ (ดึงราคาไม่ได้เลยสักตัว = bar_dates ว่าง ปล่อยผ่านตามเดิม ไม่แตะ last_bar)
         bar_date = max(bar_dates) if bar_dates else None
-        if bar_date is not None and bar_date == last_breakout_bar():
+        if bar_date is not None and bar_date == last_bar:
             logger.info("breakout: แท่งล่าสุด %s เหมือนรอบก่อน (วันหยุด/ยังไม่มีแท่งใหม่) — ข้ามแจ้งซ้ำ", bar_date)
             return
         removed = auto_remove(dead) if dead else []
@@ -864,8 +878,9 @@ async def breakout_job(context: ContextTypes.DEFAULT_TYPE):
             seen.add(snap["symbol"])
             await _send_chart(context.bot, CONFIG.chat_id, snap["symbol"],
                               snap.get("levels"),
+                              # แท่งย้อนหลัง: กราฟคือปัจจุบัน → ใช้ราคาปิดล่าสุด
                               caption=f"{tag} {snap['symbol']} — "
-                                      f"ปิด {snap['price']:,.2f}")
+                                      f"ปิด {snap.get('now_price', snap['price']):,.2f}")
         # บันทึกหลังงานแจ้งเตือนสำเร็จทั้งหมดเท่านั้น — ส่งข้อความ/ส่งกราฟล้มกลางคัน exception
         # จะโยนออกจาก work() ก่อนถึงบรรทัดนี้ claim ถูกคืน (_run_claimed) แล้ว catch-up รอบถัดไป
         # retry ส่งซ้ำได้ — ห้ามบันทึก last_bar ไปก่อนแล้วเงียบทั้งชุดถ้าส่งไม่สำเร็จจริง

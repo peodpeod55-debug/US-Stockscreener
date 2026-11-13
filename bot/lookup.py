@@ -28,6 +28,9 @@ MIN_BARS_FOR_SCORE = 70         # เกณฑ์เดียวกับ screen
 # ด่านเข้าเกณฑ์ SET ของ US: ปิด D0 ≥2% & vol ≥1.5× เท่านั้น (ไม่มีด่าน turnover — universe S&P500/DR สภาพคล่องพอ)
 # ใช้ร่วมกันใน lookup (snap["set_rule"]) และ /scanlog (bot.main)
 SET_RULE = {"min_ret_pct": SET_MIN_RET_PCT, "min_vol_ratio": SET_MIN_VOL_RATIO}
+# breakout_job ตามเก็บแท่งที่ข้ามไป (เครื่องปิด/วันหยุดไทย) ย้อนสูงสุดเท่านี้ ไม่นับแท่งล่าสุด —
+# รวมแท่งล่าสุด = 5 แท่ง ≈ หนึ่งสัปดาห์ซื้อขาย · เก่ากว่านั้นแจ้งไปก็เลยจุดที่ใช้ได้แล้ว
+MAX_MISSED_BARS = 4
 
 _TICKER_RE = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
 
@@ -212,3 +215,40 @@ def lookup_symbol(client, symbol, universe, today=None, get_prices_fn=None,
             ("earnings", symbol), lambda: client.get_earnings_dates(symbol))
     return build_snapshot(symbol, prices, meta=universe.get(symbol),
                           earnings=earnings, today=today)
+
+
+def missed_snapshots(symbol, universe, since, today=None,
+                     known_earnings_fn=known_earnings, max_bars=MAX_MISSED_BARS):
+    """snapshot "ณ แท่งนั้น" ของแท่งที่อยู่ระหว่าง since กับแท่งล่าสุด — เรียงเก่า→ใหม่
+
+    detector ทุกตัว (ทะลุแนว/หลุด SL/หลุด Low/ย่อเข้า gap) เป็น edge เทียบแท่งล่าสุดกับแท่ง
+    ก่อนหน้า — รอบที่บอทไม่ได้รัน edge ของแท่งนั้นจึงไม่มีใครเห็นอีก ฟังก์ชันนี้คิด snapshot
+    ย้อนด้วย build_snapshot ตัวเดิมบนแท่งที่ตัดหัวออก (prices[i:]) = สิ่งที่บอทควรเห็นเช้าวันนั้น
+    since: วันแท่งล่าสุดที่ breakout_job แจ้งจบไปแล้ว (ISO) · ว่าง/None = ยังไม่เคย → ไม่ย้อน
+    ไม่รวมแท่งล่าสุด (หน้าที่ lookup_symbol) · ย้อนสูงสุด max_bars แท่ง
+    แต่ละตัวติด late=True + now_price (ปิดล่าสุดจริง) ให้ข้อความบอกได้ว่าเป็นของย้อนหลัง
+    ราคา/วันงบอ่านจาก fetch_cache ที่ lookup_symbol เพิ่งเติมเท่านั้น — ไม่ยิงเครือข่ายเอง
+    (ไม่มีใน cache = คืนว่าง) · today ใช้วันจริงเหมือนแท่งล่าสุด: setup ที่เลย
+    RECENT_EARNINGS_DAYS ไปแล้ววันนี้ไม่ถูกปลุกย้อน
+    """
+    if not since:
+        return []
+    prices = fetch_cache.get(("prices", symbol, 250))
+    if not prices:
+        return []
+    earnings = known_earnings_fn(symbol) if known_earnings_fn is not None else None
+    if not earnings:
+        earnings = fetch_cache.get(("earnings", symbol))
+    out = []
+    for i in range(1, min(max_bars, len(prices) - 1) + 1):
+        if prices[i]["date"] <= since:
+            break
+        snap = build_snapshot(symbol, prices[i:], meta=universe.get(symbol),
+                              earnings=earnings, today=today)
+        if snap is None:
+            break
+        snap["late"] = True
+        snap["now_price"] = prices[0]["close"]
+        out.append(snap)
+    out.reverse()
+    return out
